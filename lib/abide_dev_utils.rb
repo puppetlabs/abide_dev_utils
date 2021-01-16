@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
-require_relative 'abide_dev_utils/version'
+require 'abide_dev_utils/version'
+require 'abide_dev_utils/xccdf'
+require 'abide_dev_utils/utils'
+require 'abide_dev_utils/errors'
 
-module AbideDevUtils
-  require_relative 'abide_dev_utils/xccdf'
-end
+# Just creates the namespace
+module AbideDevUtils; end

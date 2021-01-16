@@ -1,10 +1,16 @@
 # AbideDevUtils
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/abide_dev_utils`. To experiment with that code, run `bin/console` for an interactive prompt.
-
-TODO: Delete this and the text above, and describe your gem
+Helper library and CLI app for Abide development.
 
 ## Installation
+
+### CLI app
+
+```sh
+$ gem install abide_dev_utils
+...
+$ abide -h
+```
 
 Add this line to your application's Gemfile:
 
@@ -14,15 +20,15 @@ gem 'abide_dev_utils'
 
 And then execute:
 
-    $ bundle install
+`$ bundle install`
 
 Or install it yourself as:
 
-    $ gem install abide_dev_utils
+`$ gem install abide_dev_utils`
 
 ## Usage
 
-TODO: Write usage instructions here
+Coming soon, in the mean time run `abide -h` and `abide [command] -h` for help.
 
 ## Development
 
@@ -32,7 +38,7 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/abide_dev_utils.
+Bug reports and pull requests are welcome on GitHub at https://github.com/hsnodgrass/abide_dev_utils.
 
 ## License
 
