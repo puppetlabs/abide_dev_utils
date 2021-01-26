@@ -41,7 +41,7 @@ Gem::Specification.new do |spec|
   # Dev dependencies
   spec.add_development_dependency 'bundler'
   spec.add_development_dependency 'rake'
-  spec.add_development_dependency 'github-changelog-generator'
+  spec.add_development_dependency 'github_changelog_generator'
   spec.add_development_dependency 'gem-release'
   spec.add_development_dependency 'rspec', '~> 3.10'
   spec.add_development_dependency 'rubocop', '~> 1.8'
