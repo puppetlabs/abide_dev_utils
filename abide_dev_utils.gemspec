@@ -49,7 +49,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'rubocop-ast', '~> 1.4'
   spec.add_development_dependency 'rubocop-performance', '~> 1.9'
   spec.add_development_dependency 'rubocop-i18n', '~> 3.0'
-  spec.add_development_dependency 'fast_gettext', '~> 1.1'
+  spec.add_development_dependency 'fast_gettext', '~> 1.8'
 
   # For more information and examples about making a new gem, checkout our
   # guide at: https://bundler.io/guides/creating_gem.html

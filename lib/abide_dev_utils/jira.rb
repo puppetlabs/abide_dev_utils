@@ -148,7 +148,7 @@ module AbideDevUtils
       false
     end
 
-    def self.summaries_from_coverage_report(report)
+    def self.summaries_from_coverage_report(report) # rubocop:disable Metrics/CyclomaticComplexity
       summaries = {}
       benchmark = nil
       report.each do |k, v|
