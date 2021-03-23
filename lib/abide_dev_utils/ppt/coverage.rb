@@ -13,12 +13,14 @@ module AbideDevUtils
       def self.generate(puppet_class_dir, hiera_path, profile = nil)
         coverage = {}
         coverage['classes'] = {}
-        all_cap = find_all_classes_and_paths(puppet_class_dir)
+        all_cap = AbideDevUtils::Ppt.find_all_classes_and_paths(puppet_class_dir)
         invalid_classes = find_invalid_classes(all_cap)
-        valid_classes = all_cap.dup.transpose[0] - invalid_classes
+        valid_classes = find_valid_classes(all_cap, invalid_classes)
         coverage['classes']['invalid'] = invalid_classes
         coverage['classes']['valid'] = valid_classes
         hiera = YAML.safe_load(File.open(hiera_path))
+        profile&.gsub!(/^profile_/, '') unless profile.nil?
+
         matcher = profile.nil? ? /^profile_/ : /^profile_#{profile}/
         hiera.each do |k, v|
           key_base = k.split('::')[-1]
@@ -50,9 +52,13 @@ module AbideDevUtils
         out_hash
       end
 
-      def self.find_valid_classes(all_cap)
+      def self.find_valid_classes(all_cap, invalid_classes)
         all_classes = all_cap.dup.transpose[0]
-        all_classes - find_invalid_classes(all_cap)
+        return [] if all_classes.nil?
+
+        return all_classes - invalid_classes unless invalid_classes.nil?
+
+        all_classes
       end
 
       def self.find_invalid_classes(all_cap)

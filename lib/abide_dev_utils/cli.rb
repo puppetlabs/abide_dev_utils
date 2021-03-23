@@ -20,6 +20,7 @@ module Abide
       parser.main_options.version = AbideDevUtils::VERSION
       parser.main_options.banner = ROOT_CMD_BANNER
       parser.add_command(CmdParse::HelpCommand.new, default: true)
+      parser.add_command(CmdParse::VersionCommand.new(add_switches: true))
       parser.add_command(PuppetCommand.new)
       parser.add_command(XccdfCommand.new)
       parser.add_command(TestCommand.new)

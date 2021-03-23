@@ -125,7 +125,7 @@ Install the gem:
   * `--root-dir`, `-r` - Path to the root directory of your module. Defaults to the current working directory
   * `--absolute-template-dir`, `-A` - Allows you to specify an absolute path with `--template-dir`. This is useful if your template directory is not relative to your module's root directory
   * `--template-name`, `-n` - Allows you to specify a template name if it is different than the `TYPE` parameter
-  * `--vars`, `-v` - Comma-separated key=value pairs to pass in to the template renderer. This allows you to pass arbitrary values that can be used in your templates.
+  * `--vars`, `-V` - Comma-separated key=value pairs to pass in to the template renderer. This allows you to pass arbitrary values that can be used in your templates.
 
 `abide puppet new` exposes a few variables for you to use in your templates by default:
 
