@@ -4,7 +4,7 @@ require 'abide_dev_utils/cli/abstract'
 
 module Abide
   module CLI
-    class PuppetCommand < Command
+    class PuppetCommand < AbideCommand
       CMD_NAME = 'puppet'
       CMD_SHORT = 'Commands related to Puppet code'
       CMD_LONG = 'Namespace for commands related to Puppet code'
@@ -15,7 +15,7 @@ module Abide
       end
     end
 
-    class PuppetCoverageCommand < Command
+    class PuppetCoverageCommand < AbideCommand
       CMD_NAME = 'coverage'
       CMD_SHORT = 'Generates control coverage report'
       CMD_LONG = 'Generates report of valid Puppet classes that match with Hiera controls'
@@ -53,7 +53,7 @@ module Abide
       end
     end
 
-    class PuppetNewCommand < Command
+    class PuppetNewCommand < AbideCommand
       CMD_NAME = 'new'
       CMD_SHORT = 'Generates a new Puppet object from templates'
       CMD_LONG = 'Generates a new Puppet object (class, test, etc.) from templates stored in the module repo'

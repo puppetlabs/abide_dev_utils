@@ -1,6 +1,40 @@
 # frozen_string_literal: true
 
+require 'tempfile'
 require 'abide_dev_utils'
+
+def new_obj_cls_stubs(test_erb)
+  allow(Dir).to receive(:exist?).and_call_original
+  allow(FileTest).to receive(:file?).and_call_original
+  allow(File).to receive(:read).and_call_original
+  allow(File).to receive(:open).and_call_original
+  allow(File).to receive(:file?).and_call_original
+  allow(Dir).to receive(:exist?).with("#{Dir.pwd}/object_templates").and_return(true)
+  allow(FileTest).to receive(:file?).with("#{Dir.pwd}/object_templates/class.erb").and_return(true)
+  allow(File).to receive(:read).with("#{Dir.pwd}/object_templates/class.erb").and_return(test_erb)
+  allow(File).to receive(:open).with("#{Dir.pwd}/manifests/new/object/name.pp", 'w').and_return(true)
+  allow(File).to receive(:file?).with("#{Dir.pwd}/manifests/new/object/name.pp").and_return(true)
+end
+
+def new_obj_cust_stubs
+  allow(Dir).to receive(:exist?).and_call_original
+  allow(FileTest).to receive(:file?).and_call_original
+  allow(File).to receive(:read).and_call_original
+  allow(File).to receive(:open).and_call_original
+  allow(File).to receive(:file?).and_call_original
+  allow(Dir).to receive(:exist?).with("#{Dir.pwd}/custom_tmpl_dir").and_return(true)
+  allow(FileTest).to receive(:file?).with("#{Dir.pwd}/custom_tmpl_dir/custom.erb").and_return(true)
+end
+
+def new_obj_cmap_stubs
+  allow(Dir).to receive(:exist?).and_call_original
+  allow(FileTest).to receive(:file?).and_call_original
+  allow(File).to receive(:read).and_call_original
+  allow(File).to receive(:open).and_call_original
+  allow(File).to receive(:file?).and_call_original
+  allow(Dir).to receive(:exist?).with('/test/tmpl_dir').and_return(true)
+  allow(FileTest).to receive(:file?).with('/test/tmpl_dir/test.erb').and_return(true)
+end
 
 RSpec.describe 'AbideDevUtils::Ppt::NewObjectBuilder' do
   let(:new_obj_cls) do
@@ -24,7 +58,7 @@ RSpec.describe 'AbideDevUtils::Ppt::NewObjectBuilder' do
       'test',
       'test::new::custom::name',
       opts: {
-        root_relative: false,
+        absolute_template_dir: true,
         tmpl_dir: '/test/tmpl_dir',
         type_path_map: {
           test: {
@@ -66,54 +100,47 @@ RSpec.describe 'AbideDevUtils::Ppt::NewObjectBuilder' do
     ERB
   end
 
+  let(:test_erb_file) do
+    Tempfile.new('erb')
+  end
+
   it 'creates a builder object' do
+    new_obj_cls_stubs(test_erb)
     expect(new_obj_cls).to exist
   end
 
   it 'creates a builder object of a custom type' do
+    new_obj_cust_stubs
     expect(new_obj_cust).to exist
   end
 
   it 'creates a builder object of a custom type with map' do
+    new_obj_cmap_stubs
     expect(new_obj_cmap).to exist
   end
 
   it 'has correct object path for class type' do
+    new_obj_cls_stubs(test_erb)
     expect(new_obj_cls.obj_path).to eq "#{Dir.pwd}/manifests/new/object/name.pp"
   end
 
   it 'has correct object path for custom type' do
+    new_obj_cust_stubs
     expect(new_obj_cust.obj_path).to eq "#{Dir.pwd}/manifests/new/custom/name.pp"
   end
 
   it 'has correct object path for custom type with map' do
+    new_obj_cmap_stubs
     expect(new_obj_cmap.obj_path).to eq "#{Dir.pwd}/manifests/custom_obj/name.rb"
   end
 
-  it 'finds template by default name' do
-    allow(FileTest).to receive(:file?).with("#{Dir.pwd}/object_templates/name.erb").and_return(true)
-    expect(new_obj_cls.template?).to eq true
-  end
-
-  it 'finds custom template name in custom template dir' do
-    allow(FileTest).to receive(:file?).with("#{Dir.pwd}/custom_tmpl_dir/custom.erb").and_return(true)
-    expect(new_obj_cust.template?).to eq true
-  end
-
-  it 'finds template in non-root relative custom template dir' do
-    allow(FileTest).to receive(:file?).with('/test/tmpl_dir/name.erb').and_return(true)
-  end
-
   it 'correctly handles rendering a template' do
-    allow(FileTest).to receive(:file?).with("#{Dir.pwd}/object_templates/name.erb").and_return(true)
-    allow(File).to receive(:read).with("#{Dir.pwd}/object_templates/name.erb").and_return(test_erb)
+    new_obj_cls_stubs(test_erb)
     expect(new_obj_cls.render).to eq test_rendered_erb
   end
 
   it 'correctly handles building a template' do
-    allow(FileTest).to receive(:file?).with("#{Dir.pwd}/object_templates/name.erb").and_return(true)
-    allow(File).to receive(:read).with("#{Dir.pwd}/object_templates/name.erb").and_return(test_erb)
-    allow(File).to receive(:open).with("#{Dir.pwd}/manifests/new/object/name.pp", 'w').and_return(true)
-    expect(new_obj_cls.build).to eq true
+    new_obj_cls_stubs(test_erb)
+    expect(new_obj_cls.build).to eq "Created file #{Dir.pwd}/manifests/new/object/name.pp"
   end
 end

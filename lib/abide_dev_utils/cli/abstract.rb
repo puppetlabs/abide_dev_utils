@@ -3,7 +3,7 @@
 module Abide
   module CLI
     # @abstract
-    class Command < CmdParse::Command
+    class AbideCommand < CmdParse::Command
       include AbideDevUtils::Config
       def initialize(cmd_name, cmd_short, cmd_long, **opts)
         super(cmd_name, **opts)

@@ -25,6 +25,7 @@ module AbideDevUtils
             relative_select: './xccdf:select'
           }
         }.freeze
+        NEXT_GEN_WINDOWS = /(next_generation_windows_security)/.freeze
 
         attr_reader :title, :version
 
@@ -111,11 +112,19 @@ module AbideDevUtils
         end
 
         def normalize_str(str)
-          str.delete('-').gsub(/\s/, '_').downcase
+          nstr = str.downcase
+          nstr.gsub!(/[^a-z]$/, '')
+          nstr.gsub!(/^[^a-z]/, '')
+          nstr.gsub!(/^(l1_|l2_|ng_)/, '')
+          nstr.delete!('-')
+          nstr.gsub!(/(\s|\(|\))/, '_')
+          nstr
         end
 
         def normalize_profile_name(prof)
-          normalize_str("profile_#{prof}")
+          prof_name = normalize_str("profile_#{prof}")
+          prof_name.gsub!(NEXT_GEN_WINDOWS, 'ngws')
+          prof_name
         end
 
         def normalize_ctrl_name(ctrl)
@@ -125,12 +134,10 @@ module AbideDevUtils
 
         def make_parent_key(doc, prefix)
           doc_title = normalize_str(doc.xpath(XPATHS[:benchmark][:title]).children.to_s)
-          if prefix.nil?
-            doc_title
-          else
-            sepped_prefix = prefix.end_with?('::') ? prefix : "#{prefix}::"
-            "#{sepped_prefix.chomp}#{doc_title}"
-          end
+          return doc_title if prefix.nil?
+
+          sepped_prefix = prefix.end_with?('::') ? prefix : "#{prefix}::"
+          "#{sepped_prefix.chomp}#{doc_title}"
         end
       end
     end
