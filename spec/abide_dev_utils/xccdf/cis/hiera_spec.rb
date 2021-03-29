@@ -70,6 +70,6 @@ RSpec.describe 'AbideDevUtils::XCCDF::CIS::Hiera' do
   end
 
   it 'correctly creates Windows parent key with ngws sub' do
-    cis_windows_hiera[:cis_microsoft_windows_server_2016_rtm__release_1607__benchmark].key?(:profile_ngws__domain_controller)
+    cis_windows_hiera[:cis_microsoft_windows_server_2016_rtm_release_1607_benchmark].key?(:profile_ngws___domain_controller)
   end
 end

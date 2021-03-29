@@ -2,6 +2,8 @@
 
 Helper library and CLI app for Abide development.
 
+Issues and pull requests are welcome!
+
 ## Features
 
 ### CLI
@@ -205,6 +207,15 @@ class test_module::utils::test_new_util (
 ### XCCDF Command Reference
 
 #### to_hiera
+
+NOTE: When converting XCCDF files to Hiera, control names are sanitized. This means that some characters will be changed to ensure the resulting control names in the Hiera file are valid for both YAML and Puppet class names. Here's what gets changed:
+
+* All letters are coverted to lower case
+* The first and last characters of the control name is dropped if they are not letters (a-z)
+* If a control name has a prefix of `l1_`, `l2_`, or `ng_`, that prefix is dropped
+  * Differentiation between profile level occurs outside of control names
+* The characters `/` and `\` are deleted. This means that paths are smashed together
+* Whitespace and the characters `(`, `)`, `.`, and `-` are substituted with underscores (`_`)
 
 * Required positional parameters:
   * `XCCDF_FILE` - Path to an XCCDF XML file

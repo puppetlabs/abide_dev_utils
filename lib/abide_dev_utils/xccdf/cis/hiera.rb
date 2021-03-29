@@ -13,6 +13,7 @@ module AbideDevUtils
       # @!attribute [r] yaml_title
       class Hiera
         CONTROL_PREFIX = /^[\d.]+_/.freeze
+        UNDERSCORED = /(\s|\(|\)|-|\.)/.freeze
         XPATHS = {
           benchmark: {
             all: 'xccdf:Benchmark',
@@ -89,7 +90,7 @@ module AbideDevUtils
 
         private
 
-        attr_accessor :doc, :parent_key, :hash, :profiles
+        attr_accessor :doc, :hash, :parent_key, :profiles
 
         def parse(xccdf_file)
           raise AbideDevUtils::Errors::FileNotFoundError, xccdf_file unless File.file?(xccdf_file)
@@ -116,8 +117,8 @@ module AbideDevUtils
           nstr.gsub!(/[^a-z]$/, '')
           nstr.gsub!(/^[^a-z]/, '')
           nstr.gsub!(/^(l1_|l2_|ng_)/, '')
-          nstr.delete!('-')
-          nstr.gsub!(/(\s|\(|\))/, '_')
+          nstr.delete!('(/|\\)')
+          nstr.gsub!(UNDERSCORED, '_')
           nstr
         end
 
@@ -129,7 +130,7 @@ module AbideDevUtils
 
         def normalize_ctrl_name(ctrl)
           new_ctrl = ctrl.split('_rule_')[-1].gsub(CONTROL_PREFIX, '')
-          normalize_str(new_ctrl.gsub(/\./, '_'))
+          normalize_str(new_ctrl)
         end
 
         def make_parent_key(doc, prefix)
