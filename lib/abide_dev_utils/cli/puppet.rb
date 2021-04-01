@@ -87,6 +87,7 @@ module Abide
           '--vars [VARNAME=VALUE]',
           'Allows you to specify comma-separated variable names and values that will be converted into a hash that is available for you to use in your templates'
         ) { |v| @data[:vars] = v }
+        options.on()
       end
 
       def execute(type, name)

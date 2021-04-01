@@ -114,7 +114,7 @@ module AbideDevUtils
 
         def normalize_str(str)
           nstr = str.downcase
-          nstr.gsub!(/[^a-z]$/, '')
+          nstr.gsub!(/[^a-z0-9]$/, '')
           nstr.gsub!(/^[^a-z]/, '')
           nstr.gsub!(/^(l1_|l2_|ng_)/, '')
           nstr.delete!('(/|\\)')

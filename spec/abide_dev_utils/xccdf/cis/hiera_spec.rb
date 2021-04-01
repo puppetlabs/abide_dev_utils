@@ -45,7 +45,7 @@ RSpec.describe 'AbideDevUtils::XCCDF::CIS::Hiera' do
     expect(cis_linux_hiera[:cis_centos_linux_7_benchmark][:version]).to eq '3.0.0'
   end
 
-  it 'correctly trims non-alpha character at end of string' do
+  it 'correctly trims non-alphanumeric character at end of string' do
     expect(cis_linux_hiera.send(:normalize_str, 'test_string.')).to eq 'test_string'
   end
 
