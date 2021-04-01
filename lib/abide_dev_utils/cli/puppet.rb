@@ -87,7 +87,16 @@ module Abide
           '--vars [VARNAME=VALUE]',
           'Allows you to specify comma-separated variable names and values that will be converted into a hash that is available for you to use in your templates'
         ) { |v| @data[:vars] = v }
-        options.on()
+        options.on(
+          '-S [PATH]',
+          '--spec-template [PATH]',
+          'Path to an ERB template to use for rspec test generation instead of the default'
+        )
+        options.on(
+          '-f',
+          '--force',
+          'Skips any prompts and executes the command'
+        ) { |_| @data[:force] = true }
       end
 
       def execute(type, name)
@@ -98,8 +107,7 @@ module Abide
           opts: @data,
           vars: @data.fetch(:vars, '').split(',').map { |i| i.split('=') }.to_h # makes the str a hash
         )
-        result = builder.build
-        Abide::CLI::OUTPUT.simple(result)
+        builder.build
       end
     end
   end

@@ -128,6 +128,8 @@ Install the gem:
   * `--absolute-template-dir`, `-A` - Allows you to specify an absolute path with `--template-dir`. This is useful if your template directory is not relative to your module's root directory
   * `--template-name`, `-n` - Allows you to specify a template name if it is different than the `TYPE` parameter
   * `--vars`, `-V` - Comma-separated key=value pairs to pass in to the template renderer. This allows you to pass arbitrary values that can be used in your templates.
+  * `--spec-template`, `-S` - Path to an ERB template to use for rspec test generation instead of the default
+  * `--force`, `-f` - Skips any prompts and executes the command
 
 `abide puppet new` exposes a few variables for you to use in your templates by default:
 
@@ -179,8 +181,10 @@ $ ls manifests
 init.pp
 $ abide puppet new control_class 'test_module::controls::test_new_control'
 Created file /Users/the.dude/test_module/manifests/controls/test_new_control.pp
+Created file /Users/the.dude/test_module/spec/classes/controls/test_new_control_spec.rb
 $ abide puppet new util_class 'test_module::utils::test_new_util' -v 'testvar1=dude,testvar2=sweet'
 Created file /Users/the.dude/test_module/manifests/utils/test_new_util.pp
+Created file /Users/the.dude/test_module/spec/classes/utils/test_new_util_spec.rb
 $ cat manifests/controls/test_new_control.pp
 # @api private
 class test_module::controls::test_new_control (
@@ -203,6 +207,9 @@ class test_module::utils::test_new_util (
 }
 
 ```
+
+**NOTE**: You can use two special prefixes on your template files to denote where the rspec test should be generated for that object.
+If the prefix `c-` is used, the test will be generated in the `spec/classes` directory. If the prefix `d-` is used, the test will be generated in the `spec/defines` directory. For example, to create a template for a defined type, name the template something like this: `d-my_defined_type.pp.erb`.
 
 ### XCCDF Command Reference
 
