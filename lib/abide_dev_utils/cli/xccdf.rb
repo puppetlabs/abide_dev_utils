@@ -27,8 +27,12 @@ module Abide
         long_desc(CMD_LONG)
         options.on('-b [TYPE]', '--benchmark-type [TYPE]', 'XCCDF Benchmark type') { |b| @data[:type] = b }
         options.on('-o [FILE]', '--out-file [FILE]', 'Path to save file') { |f| @data[:file] = f }
-        options.on('-p [PREFIX]', '--parent-key-prefix [PREFIX]', 'A prefix to append to the parent key') { |p| @data[:parent_key_prefix] = p }
-        options.on('-N', '--number-fmt', 'Format Hiera control names based off of control number instead of name.') { |s| @data[:num] = true }
+        options.on('-p [PREFIX]', '--parent-key-prefix [PREFIX]', 'A prefix to append to the parent key') do |p|
+          @data[:parent_key_prefix] = p
+        end
+        options.on('-N', '--number-fmt', 'Format Hiera control names based off of control number instead of name.') do
+          @data[:num] = true
+        end
       end
 
       def execute(xccdf_file)
@@ -41,8 +45,7 @@ module Abide
 
       def to_hiera(xccdf_file)
         xfile = AbideDevUtils::XCCDF.to_hiera(xccdf_file, @data)
-        console = @data[:file].nil? ? true : false
-        Abide::CLI::OUTPUT.yaml(xfile, console: console, file: @data[:file])
+        Abide::CLI::OUTPUT.yaml(xfile, console: @data[:file].nil?, file: @data[:file])
       end
     end
   end
