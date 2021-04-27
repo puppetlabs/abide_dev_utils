@@ -12,6 +12,9 @@ RSpec.describe 'AbideDevUtils::XCCDF::CIS::Hiera' do
   let(:windows_xccdf) { "#{spec_dir}/resources/cis/CIS_Microsoft_Windows_Server_2016_RTM_\(Release_1607\)_Benchmark_v1.2.0-xccdf.xml" }
   let(:cis_linux_hiera) { AbideDevUtils::XCCDF::CIS::Hiera.new(linux_xccdf) }
   let(:cis_windows_hiera) { AbideDevUtils::XCCDF::CIS::Hiera.new(windows_xccdf) }
+  let(:ctrl) { 'xccdf_org.cisecurity.benchmarks_rule_1.1.1.3_Ensure_mounting_of_udf_filesystems_is_disabled' }
+  let(:ctrl_name_fmt) { 'ensure_mounting_of_udf_filesystems_is_disabled' }
+  let(:ctrl_num_fmt) { 'c1_1_1_3' }
 
   it 'creates a Hiera object from Linux XCCDF file' do
     expect(cis_linux_hiera).to exist
@@ -63,6 +66,14 @@ RSpec.describe 'AbideDevUtils::XCCDF::CIS::Hiera' do
 
   it 'correctly normalizes string' do
     expect(cis_linux_hiera.send(:normalize_str, '.l2_test_string.')).to eq 'test_string'
+  end
+
+  it 'correctly formats control name by name' do
+    expect(cis_linux_hiera.send(:normalize_ctrl_name, ctrl, false)).to eq ctrl_name_fmt
+  end
+
+  it 'correctly formats control name by num' do
+    expect(cis_linux_hiera.send(:normalize_ctrl_name, ctrl, true)).to eq ctrl_num_fmt
   end
 
   it 'correctly creates Linux parent key' do

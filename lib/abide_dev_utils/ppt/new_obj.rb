@@ -22,9 +22,10 @@ module AbideDevUtils
         @vars = vars
         class_vars
         validate_class_vars
+        @tmpl_data = template_data(@opts.fetch(:tmpl_name, @obj_type))
       end
 
-      attr_reader :obj_type, :obj_name, :root_dir, :tmpl_dir, :obj_path, :vars
+      attr_reader :obj_type, :obj_name, :root_dir, :tmpl_dir, :obj_path, :vars, :tmpl_data
 
       def build
         force = @opts.fetch(:force, false)
@@ -85,7 +86,6 @@ module AbideDevUtils
                     else
                       "#{@root_dir}/#{@opts.fetch(:tmpl_dir, 'object_templates')}"
                     end
-        @tmpl_data = template_data(@opts.fetch(:tmpl_name, @obj_type))
         @obj_path = new_obj_path
         @spec_tmpl = @opts.fetch(:spec_template, File.expand_path(File.join(__dir__, '../resources/generic_spec.erb')))
       end
@@ -129,7 +129,7 @@ module AbideDevUtils
         data[:pfx] = data[:fname].match?(OBJ_PREFIX) ? data[:fname].match(OBJ_PREFIX)[1] : 'c-'
         data[:spec_base] = PREFIX_TEST_PATH[data[:pfx]]
         data[:obj_name] = normalize_obj_name(data.dup)
-        data[:spec_name] = "#{data[:obj_name].slice(/([^\s]+)(?:#{Regexp.quote(data[:ext])})/, 1)}_spec.rb"
+        data[:spec_name] = "#{@obj_name.split('::')[-1]}_spec.rb"
         data[:spec_path] = spec_path(data[:spec_base], data[:spec_name])
         data
       end

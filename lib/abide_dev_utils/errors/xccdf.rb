@@ -8,5 +8,9 @@ module AbideDevUtils
     class XPathSearchError < GenericError
       @default = 'XPath seach failed to find anything at:'
     end
+
+    class StrategyInvalidError < GenericError
+      @default = 'Invalid strategy selected. Should be either \'name\' or \'num\''
+    end
   end
 end

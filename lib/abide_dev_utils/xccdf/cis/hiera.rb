@@ -35,13 +35,13 @@ module AbideDevUtils
         # @param parent_key_prefix [String] a string to be prepended to the
         #   top-level key in the Hiera structure. Useful for namespacing
         #   the top-level key.
-        def initialize(xccdf_file, parent_key_prefix: nil)
+        def initialize(xccdf_file, parent_key_prefix: nil, num: false)
           @doc = parse(xccdf_file)
           @title = xpath(XPATHS[:benchmark][:title]).children.to_s
           @version = xpath(XPATHS[:benchmark][:version]).children.to_s
           @profiles = xpath(XPATHS[:profiles][:all])
           @parent_key = make_parent_key(@doc, parent_key_prefix)
-          @hash = make_hash(@doc, @parent_key)
+          @hash = make_hash(@doc, @parent_key, num)
         end
 
         def yaml_title
@@ -92,13 +92,16 @@ module AbideDevUtils
 
         attr_accessor :doc, :hash, :parent_key, :profiles
 
+        # Accepts a path to an xccdf xml file and returns a parsed Nokogiri object of the file
+        # @param xccdf_file [String] path to an xccdf xml file
+        # @return [Nokogiri::Node] A Nokogiri node object of the XML document
         def parse(xccdf_file)
           raise AbideDevUtils::Errors::FileNotFoundError, xccdf_file unless File.file?(xccdf_file)
 
           Nokogiri.XML(File.open(xccdf_file))
         end
 
-        def make_hash(doc, parent_key)
+        def make_hash(doc, parent_key, num)
           hash = { parent_key.to_sym => { title: @title, version: @version } }
           profiles = doc.xpath('xccdf:Benchmark/xccdf:Profile')
           profiles.each do |p|
@@ -106,7 +109,7 @@ module AbideDevUtils
             hash[parent_key.to_sym][title.to_sym] = []
             selects = p.xpath('./xccdf:select')
             selects.each do |s|
-              hash[parent_key.to_sym][title.to_sym] << normalize_ctrl_name(s['idref'].to_s)
+              hash[parent_key.to_sym][title.to_sym] << normalize_ctrl_name(s['idref'].to_s, num)
             end
           end
           hash
@@ -128,9 +131,21 @@ module AbideDevUtils
           prof_name
         end
 
-        def normalize_ctrl_name(ctrl)
-          new_ctrl = ctrl.split('_rule_')[-1].gsub(CONTROL_PREFIX, '')
+        def normalize_ctrl_name(ctrl, num)
+          return num_normalize_ctrl(ctrl) if num
+
+          name_normalize_ctrl(ctrl)
+        end
+
+        def name_normalize_ctrl(ctrl)
+          new_ctrl = ctrl.split('benchmarks_rule_')[-1].gsub(CONTROL_PREFIX, '')
           normalize_str(new_ctrl)
+        end
+
+        def num_normalize_ctrl(ctrl)
+          part = ctrl.split('benchmarks_rule_')[-1]
+          numpart = CONTROL_PREFIX.match(part).to_s.chop.gsub(UNDERSCORED, '_')
+          "c#{numpart}"
         end
 
         def make_parent_key(doc, prefix)

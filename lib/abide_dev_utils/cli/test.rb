@@ -35,10 +35,10 @@ module Abide
         @litmus_im = [CMD_LIT_BASE, "'litmus:install_module'"]
         @litmus_ap = [CMD_LIT_BASE, "'litmus:acceptance:parallel'"]
         @litmus_td = [CMD_LIT_BASE, "'litmus:tear_down'"]
-        validate_env_and_opts
       end
 
       def execute(suite)
+        validate_env_and_opts
         case suite.downcase
         when /^a[A-Za-z]*/
           run_command(@validate)

@@ -92,8 +92,8 @@ RSpec.describe 'AbideDevUtils::Ppt::NewObjectBuilder' do
       pfx: 'd-',
       spec_base: 'defines',
       obj_name: 'test.rb',
-      spec_name: 'test_spec.rb',
-      spec_path: "#{Dir.pwd}/spec/defines/new/object/test_spec.rb"
+      spec_name: 'name_spec.rb',
+      spec_path: "#{Dir.pwd}/spec/defines/new/object/name_spec.rb"
     }
   end
 
@@ -115,6 +115,12 @@ RSpec.describe 'AbideDevUtils::Ppt::NewObjectBuilder' do
   it 'has correct object path for custom type' do
     new_obj_cust_stubs
     expect(new_obj_cust.obj_path).to eq "#{Dir.pwd}/manifests/new/custom/name.pp"
+  end
+
+  it 'has correct spec path for class type' do
+    new_obj_cls_stubs(test_erb)
+    puts new_obj_cls.tmpl_data
+    expect(new_obj_cls.tmpl_data[:spec_path]).to eq "#{Dir.pwd}/spec/classes/new/object/name_spec.rb"
   end
 
   it 'correctly finds template file' do

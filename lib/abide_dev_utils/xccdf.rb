@@ -15,7 +15,7 @@ module AbideDevUtils
       type = opts.fetch(:type, 'cis')
       case type.downcase
       when 'cis'
-        AbideDevUtils::XCCDF::CIS::Hiera.new(xccdf_file, parent_key_prefix: opts[:parent_key_prefix])
+        AbideDevUtils::XCCDF::CIS::Hiera.new(xccdf_file, parent_key_prefix: opts[:parent_key_prefix], strategy: opts[:strategy])
       else
         AbideDevUtils::Output.simple("XCCDF type #{type} is unsupported!")
       end

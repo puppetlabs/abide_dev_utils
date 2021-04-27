@@ -28,6 +28,7 @@ module Abide
         options.on('-b [TYPE]', '--benchmark-type [TYPE]', 'XCCDF Benchmark type') { |b| @data[:type] = b }
         options.on('-o [FILE]', '--out-file [FILE]', 'Path to save file') { |f| @data[:file] = f }
         options.on('-p [PREFIX]', '--parent-key-prefix [PREFIX]', 'A prefix to append to the parent key') { |p| @data[:parent_key_prefix] = p }
+        options.on('-N', '--number-fmt', 'Format Hiera control names based off of control number instead of name.') { |s| @data[:num] = true }
       end
 
       def execute(xccdf_file)

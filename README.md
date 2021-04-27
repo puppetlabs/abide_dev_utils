@@ -231,6 +231,15 @@ NOTE: When converting XCCDF files to Hiera, control names are sanitized. This me
   * `--out-file`, `-o` - A path to a file where you would like to save the generated Hiera
   * `--parent-key-prefix`, `-p` - Allows you to append a prefix to all top-level Hiera keys
 
+## Docker
+
+A Dockerfile has been provided in this repo for convenience since Ruby environments can be painful to deal with. To abide_dev_utils with Docker:
+
+* Build the Dockerfile: `docker build . -t abide_dev_utils --build-arg version=<semver>`
+* Run the commands using the container: `docker run -it abide_dev_utils --help`
+* The container declares a volume for external resources such as files. To use the volume, add the following flag to your `docker run` commands: `-v /path/to/my/files:/extvol`
+  * When using the volume, all paths should be absolute based on the root directory `/extvol`
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
