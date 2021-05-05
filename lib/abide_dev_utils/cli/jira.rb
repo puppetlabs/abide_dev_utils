@@ -1,10 +1,12 @@
 # frozen_string_literal: true
 
 require 'json'
+require 'abide_dev_utils/config'
 require 'abide_dev_utils/jira'
 
 module Abide
   module CLI
+    CONFIG = AbideDevUtils::Config
     JIRA = AbideDevUtils::Jira
 
     class JiraCommand < CmdParse::Command

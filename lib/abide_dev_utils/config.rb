@@ -7,13 +7,17 @@ module AbideDevUtils
     DEFAULT_PATH = "#{File.expand_path('~')}/.abide_dev.yaml"
 
     def self.to_h(path = DEFAULT_PATH)
+      return {} unless File.file?(path)
+
       h = YAML.safe_load(File.open(path), [Symbol])
       h.transform_keys(&:to_sym)
     end
 
     def self.config_section(section, path = DEFAULT_PATH)
       h = to_h(path)
-      s = h[section.to_sym]
+      s = h.fetch(section.to_sym, nil)
+      return {} if s.nil?
+
       s.transform_keys(&:to_sym)
     end
 

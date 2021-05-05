@@ -86,6 +86,8 @@ module AbideDevUtils
 
     def self.client(options: {})
       opts = merge_options(options)
+      return client_from_prompts if opts.empty?
+
       opts[:username] = AbideDevUtils::Prompt.username if opts[:username].nil?
       opts[:password] = AbideDevUtils::Prompt.password if opts[:password].nil?
       opts[:site] = AbideDevUtils::Prompt.single_line('Jira URL') if opts[:site].nil?
