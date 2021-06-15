@@ -59,8 +59,8 @@ module Abide
       def execute(issue)
         client = JIRA.client(options: {})
         issue = client.Issue.find(issue)
-        console = @data[:file].nil? ? true : false
-        out_json = issue.attrs.select { |_,v| !v.nil? || !v.empty? }
+        console = @data[:file].nil?
+        out_json = issue.attrs.select { |_, v| !v.nil? || !v.empty? }
         Abide::CLI::OUTPUT.json(out_json, console: console, file: @data[:file])
       end
     end

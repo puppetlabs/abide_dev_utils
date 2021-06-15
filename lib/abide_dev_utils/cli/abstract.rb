@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'abide_dev_utils/config'
+
 module Abide
   module CLI
     # @abstract

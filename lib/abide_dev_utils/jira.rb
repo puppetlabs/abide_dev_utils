@@ -135,6 +135,16 @@ module AbideDevUtils
       end
     end
 
+    # def self.new_issues_from_comply_report(client, project, report, dry_run: false)
+    #   dr_prefix = dry_run ? 'DRY RUN: ' : ''
+    #   i_attrs = all_project_issues_attrs(project)
+    #   rep_sums = summaries_from_coverage_report(report)
+    #   rep_sums.each do |k, v|
+    #     next if summary_exist?(k, i_attrs)
+
+    #     progress = AbideDevUtils::Output.progress(title: "#{dr_prefix}Creating Tasks", total: nil)
+    #     v.each do |s|
+
     def self.merge_options(options)
       config.merge(options)
     end
@@ -166,6 +176,11 @@ module AbideDevUtils
       end
       summaries.transform_keys { |k| "#{COV_PARENT_SUMMARY_PREFIX}#{benchmark}-#{k}"}
     end
+
+    # def self.summaries_from_comply_report(report)
+    #   summaries = {}
+    #   report.each do |_, v|
+    # end
 
     class Dummy
       def attrs

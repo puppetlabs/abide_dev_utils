@@ -37,6 +37,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'puppet', '>= 6.19'
   spec.add_dependency 'jira-ruby', '~> 2.1'
   spec.add_dependency 'ruby-progressbar', '~> 1.11'
+  spec.add_dependency 'selenium-webdriver', '~> 4.0.0.beta4'
 
   # Dev dependencies
   spec.add_development_dependency 'bundler'

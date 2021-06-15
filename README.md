@@ -29,6 +29,10 @@ Issues and pull requests are welcome!
 
 * Create Jira issues in bulk from coverage reports
 
+### Puppet Comply Report Generation
+
+* Allows you ot programatically generate compliance reports from Puppet Comply
+
 ### Supports Configuration via Local YAML file
 
 * Fully configurable via the `~/.abide_dev.yaml` file
