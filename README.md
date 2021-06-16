@@ -88,6 +88,8 @@ Install the gem:
 
 ### Overview of Commands
 
+* `abide comply` - Command namespace for Puppet Comply commands
+  * `abide comply report` - Creates a scan report in YAML format by scraping Puppet Comply
 * `abide jira` - Command namespace for Jira commands
   * `abide jira auth` - Authenticate with Jira. Only useful as a stand-alone command to test authentication
   * `abide jira from_coverage` - Creates a parent issue with subtasks from a Puppet coverage report
@@ -99,6 +101,34 @@ Install the gem:
 * `abide test` - **BUGGED** Runs a module's test suite. Currently has issues with local gem environments.
 * `abide xccdf` - Command namespace for XCCDF commands
   * `abide xccdf to_hiera` - Converts a benchmark XCCDF file to a Hiera yaml file
+
+### Comply Command Reference
+
+#### report
+
+* Required positional parameters:
+  * `COMPLY_URL` - The URL of Puppet Comply
+  * `COMPLY_PASSWORD` - The password for the Puppet Comply user
+* Options:
+  * `--out-file`, `-o` - The path to save the scan report. Defaults to `./comply_scan_report.yaml`
+  * `--username`, `-u` - The Puppet Comply username. Defaults to `comply`
+  * `--status`, `-s` - A comma-separated list of check statuses to ONLY include in the report. Valid statuses are: `pass`, `fail`, `error`, `notapplicable`, `notchecked`, `unknown`, `informational`
+  * `--only`, `-O` - A comma-separated list of node certnames to ONLY build reports for. No other nodes will have reports built for them except the ones specified. This option is mutually exclusive with `--ignore` and, if both are set, this options will take precedence over `--ignore`.
+  * `--ignore`, `-I` - A comma-separated list of node certnames to ignore building reports for. This options is mutually exclusive with `--only` and, if both are set, `--only` will take precedence over this option.
+
+Examples:
+
+Generating a report of all failed and err'd scan checks
+
+```sh
+abide comply report https://comply.my.instance 'my_comply_password!' -s fail,error
+```
+
+Generating a report for certain nodes only
+
+```sh
+abide comply report https://comply.my.instance 'my_comply_password!' -O specific-node.my.instance
+```
 
 ### Jira Command Reference
 
