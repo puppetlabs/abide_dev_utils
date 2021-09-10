@@ -80,7 +80,7 @@ module Abide
         comply_url = conf.fetch(:url) if comply_url.nil?
         comply_password = comply_password.nil? ? conf.fetch(:password, Abide::CLI::PROMPT.password) : comply_password
         username = @data.fetch(:username, nil).nil? ? conf.fetch(:username, 'comply') : @data[:username]
-        status = @data.fetch(:status, nil).nil? ? conf.fecth(:status, nil) : @data[:status]
+        status = @data.fetch(:status, nil).nil? ? conf.fetch(:status, nil) : @data[:status]
         ignorelist = @data.fetch(:ignore, nil).nil? ? conf.fetch(:ignore, nil) : @data[:ignore]
         onlylist = @data.fetch(:only, nil).nil? ? conf.fetch(:only, nil) : @data[:only]
         report = AbideDevUtils::Comply.scan_report(comply_url,

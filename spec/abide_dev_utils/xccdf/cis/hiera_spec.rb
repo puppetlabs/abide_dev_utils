@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'pathname'
+require 'yaml'
 require 'abide_dev_utils'
 require 'abide_dev_utils/errors'
 
@@ -45,7 +46,7 @@ RSpec.describe 'AbideDevUtils::XCCDF::CIS::Hiera' do
   end
 
   it 'correctly returns value from hash attr using bracket syntax' do
-    expect(cis_linux_hiera[:cis_centos_linux_7_benchmark][:version]).to eq '3.0.0'
+    expect(cis_linux_hiera['version']).to eq '3.0.0'
   end
 
   it 'correctly trims non-alphanumeric character at end of string' do
@@ -77,10 +78,10 @@ RSpec.describe 'AbideDevUtils::XCCDF::CIS::Hiera' do
   end
 
   it 'correctly creates Linux parent key' do
-    cis_linux_hiera[:cis_centos_linux_7_benchmark].key?(:profile_level_1__server)
+    expect(YAML.safe_load(cis_linux_hiera.to_yaml).key?('cis_centos_linux_7_benchmark::title')).to be_truthy
   end
 
   it 'correctly creates Windows parent key with ngws sub' do
-    cis_windows_hiera[:cis_microsoft_windows_server_2016_rtm_release_1607_benchmark].key?(:profile_ngws___domain_controller)
+    expect(YAML.safe_load(cis_windows_hiera.to_yaml).key?('cis_microsoft_windows_server_2016_rtm_release_1607_benchmark::title')).to be_truthy
   end
 end

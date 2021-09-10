@@ -45,6 +45,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'console'
   spec.add_development_dependency 'github_changelog_generator'
   spec.add_development_dependency 'gem-release'
+  spec.add_development_dependency 'pry'
   spec.add_development_dependency 'rspec', '~> 3.10'
   spec.add_development_dependency 'rubocop', '~> 1.8'
   spec.add_development_dependency 'rubocop-rspec', '~> 2.1'

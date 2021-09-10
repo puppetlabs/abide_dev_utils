@@ -41,7 +41,7 @@ module AbideDevUtils
           @version = xpath(XPATHS[:benchmark][:version]).children.to_s
           @profiles = xpath(XPATHS[:profiles][:all])
           @parent_key = make_parent_key(@doc, parent_key_prefix)
-          @hash = make_hash(@doc, @parent_key, num)
+          @hash = make_hash(@doc, num)
         end
 
         def yaml_title
@@ -63,8 +63,8 @@ module AbideDevUtils
         # Convert the Hiera object to YAML string
         # @return [String] YAML-formatted string
         def to_yaml
-          yh = @hash[@parent_key.to_sym].transform_keys do |k|
-            "#{@parent_key}::#{k}"
+          yh = @hash.transform_keys do |k|
+            [@parent_key, k].join('::').strip
           end
           yh.to_yaml
         end
@@ -101,15 +101,15 @@ module AbideDevUtils
           Nokogiri.XML(File.open(xccdf_file))
         end
 
-        def make_hash(doc, parent_key, num)
-          hash = { parent_key.to_sym => { title: @title, version: @version } }
+        def make_hash(doc, num)
+          hash = { 'title' => @title, 'version' => @version }
           profiles = doc.xpath('xccdf:Benchmark/xccdf:Profile')
           profiles.each do |p|
             title = normalize_profile_name(p.xpath('./xccdf:title').children.to_s)
-            hash[parent_key.to_sym][title.to_sym] = []
+            hash[title.to_s] = []
             selects = p.xpath('./xccdf:select')
             selects.each do |s|
-              hash[parent_key.to_sym][title.to_sym] << normalize_ctrl_name(s['idref'].to_s, num)
+              hash[title.to_s] << normalize_ctrl_name(s['idref'].to_s, num)
             end
           end
           hash
@@ -120,14 +120,16 @@ module AbideDevUtils
           nstr.gsub!(/[^a-z0-9]$/, '')
           nstr.gsub!(/^[^a-z]/, '')
           nstr.gsub!(/^(l1_|l2_|ng_)/, '')
-          nstr.delete!('(/|\\)')
+          nstr.delete!('(/|\\|\+)')
           nstr.gsub!(UNDERSCORED, '_')
+          nstr.strip!
           nstr
         end
 
         def normalize_profile_name(prof)
           prof_name = normalize_str("profile_#{prof}")
           prof_name.gsub!(NEXT_GEN_WINDOWS, 'ngws')
+          prof_name.strip!
           prof_name
         end
 
