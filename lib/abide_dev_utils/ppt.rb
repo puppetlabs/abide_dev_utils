@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require 'abide_dev_utils/output'
+require 'abide_dev_utils/validate'
+require 'abide_dev_utils/errors'
 require 'abide_dev_utils/ppt/class_utils'
 
 module AbideDevUtils
@@ -74,6 +76,77 @@ module AbideDevUtils
         opts: opts,
         vars: opts.fetch(:vars, '').split(',').map { |i| i.split('=') }.to_h # makes the str a hash
       ).build
+    end
+
+    def self.add_cis_comment(path, xccdf, number_format: false)
+      require 'abide_dev_utils/xccdf'
+      utils = AbideDevUtils::XCCDF::UtilsObject
+      parsed_xccdf = utils.parse(xccdf)
+      return add_cis_comment_to_all(path, parsed_xccdf, utils, number_format: number_format) if File.directory?(path)
+      return add_cis_comment_to_single(path, parsed_xccdf, utils, number_format: number_format) if File.file?(path)
+
+      raise AbideDevUtils::Errors::FileNotFoundError, path
+    end
+
+    def self.add_cis_comment_to_single(path, xccdf, utils, number_format: false)
+      write_cis_comment_to_file(
+        path,
+        cis_recommendation_comment(
+          path,
+          utils.all_cis_recommendations(xccdf),
+          number_format,
+          utils
+        )
+      )
+    end
+
+    def self.add_cis_comment_to_all(path, xccdf, utils, number_format: false)
+      comments = {}
+      recommendations = utils.all_cis_recommendations(xccdf)
+      Dir[File.join(path, '*.pp')].each do |puppet_file|
+        comment = cis_recommendation_comment(puppet_file, recommendations, number_format, utils)
+        comments[puppet_file] = comment unless comment.nil?
+      end
+      comments.each do |key, value|
+        write_cis_comment_to_file(key, value)
+      end
+      AbideDevUtils::Output.simple('Successfully added comments.')
+    end
+
+    def self.write_cis_comment_to_file(path, comment)
+      require 'tempfile'
+      tempfile = Tempfile.new
+      begin
+        File.open(tempfile, 'w') do |nf|
+          nf.write("#{comment}\n")
+          File.foreach(path) do |line|
+            next if line.match?(/#{comment}/)
+
+            nf << line
+          end
+        end
+        File.rename(path, "#{path}.old")
+        tempfile.close
+        File.rename(tempfile.path, path)
+        File.delete("#{path}.old")
+        AbideDevUtils::Output.simple("Added CIS recomendation comment to #{path}...")
+      ensure
+        tempfile.close
+        tempfile.unlink
+      end
+    end
+
+    def self.cis_recommendation_comment(puppet_file, recommendations, number_format, utils)
+      reco_text = utils.find_cis_recommendation(
+        File.basename(puppet_file, '.pp'),
+        recommendations,
+        number_format: number_format
+      )
+      if reco_text.nil?
+        AbideDevUtils::Output.simple("Could not find recommendation text for #{puppet_file}...")
+        return nil
+      end
+      "# #{reco_text}"
     end
   end
 end

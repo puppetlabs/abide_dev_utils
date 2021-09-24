@@ -17,6 +17,7 @@ module Abide
         add_command(PuppetRenameCommand.new)
         add_command(PuppetFixClassNamesCommand.new)
         add_command(PuppetAuditClassNamesCommand.new)
+        add_command(PuppetAddCISCommentCommand.new)
       end
     end
 
@@ -197,6 +198,23 @@ module Abide
         end
 
         AbideDevUtils::Ppt.audit_class_names(dir, **@data)
+      end
+    end
+
+    class PuppetAddCISCommentCommand < AbideCommand
+      CMD_NAME = 'add-cis-comment'
+      CMD_SHORT = 'Adds the CIS recommendation name to the top of a .pp file'
+      CMD_LONG = 'Adds the CIS recommendation name to the top of a .pp file. Finds CIS recommendation by pattern-matching the class name against XCCDF recommendations.'
+      CMD_PATH_ARG = 'Path to a .pp file or to a directory containing .pp files'
+      CMD_XCCDF_ARG = 'Path to XCCDF file to source recommendation names from'
+      def initialize
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
+        argument_desc(PATH: CMD_PATH_ARG, XCCDF: CMD_XCCDF_ARG)
+        options.on('-N', '--number-format', 'Matches based on number-formatted control class names') { @data[:number_format] = true }
+      end
+
+      def execute(path, xccdf)
+        AbideDevUtils::Ppt.add_cis_comment(path, xccdf, number_format: @data.fetch(:number_format, false))
       end
     end
   end

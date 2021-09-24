@@ -20,5 +20,10 @@ module AbideDevUtils
         AbideDevUtils::Output.simple("XCCDF type #{type} is unsupported!")
       end
     end
+
+    class UtilsObject
+      require 'abide_dev_utils/xccdf/utils'
+      extend AbideDevUtils::XCCDF::Utils
+    end
   end
 end

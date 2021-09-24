@@ -3,6 +3,7 @@
 require 'yaml'
 require 'nokogiri'
 require 'abide_dev_utils/errors'
+require 'abide_dev_utils/xccdf/utils'
 
 module AbideDevUtils
   module XCCDF
@@ -12,21 +13,23 @@ module AbideDevUtils
       # @!attribute [r] version
       # @!attribute [r] yaml_title
       class Hiera
-        CONTROL_PREFIX = /^[\d.]+_/.freeze
-        UNDERSCORED = /(\s|\(|\)|-|\.)/.freeze
-        XPATHS = {
-          benchmark: {
-            all: 'xccdf:Benchmark',
-            title: 'xccdf:Benchmark/xccdf:title',
-            version: 'xccdf:Benchmark/xccdf:version'
-          },
-          profiles: {
-            all: 'xccdf:Benchmark/xccdf:Profile',
-            relative_title: './xccdf:title',
-            relative_select: './xccdf:select'
-          }
-        }.freeze
-        NEXT_GEN_WINDOWS = /(next_generation_windows_security)/.freeze
+        include AbideDevUtils::XCCDF::Utils
+
+        # CONTROL_PREFIX = /^[\d.]+_/.freeze
+        # UNDERSCORED = /(\s|\(|\)|-|\.)/.freeze
+        # XPATHS = {
+        #   benchmark: {
+        #     all: 'xccdf:Benchmark',
+        #     title: 'xccdf:Benchmark/xccdf:title',
+        #     version: 'xccdf:Benchmark/xccdf:version'
+        #   },
+        #   profiles: {
+        #     all: 'xccdf:Benchmark/xccdf:Profile',
+        #     relative_title: './xccdf:title',
+        #     relative_select: './xccdf:select'
+        #   }
+        # }.freeze
+        # NEXT_GEN_WINDOWS = /(next_generation_windows_security)/.freeze
 
         attr_reader :title, :version
 
@@ -37,15 +40,15 @@ module AbideDevUtils
         #   the top-level key.
         def initialize(xccdf_file, parent_key_prefix: nil, num: false)
           @doc = parse(xccdf_file)
-          @title = xpath(XPATHS[:benchmark][:title]).children.to_s
-          @version = xpath(XPATHS[:benchmark][:version]).children.to_s
-          @profiles = xpath(XPATHS[:profiles][:all])
+          @title = xpath(CIS_XPATHS[:benchmark][:title]).children.to_s
+          @version = xpath(CIS_XPATHS[:benchmark][:version]).children.to_s
+          @profiles = xpath(CIS_XPATHS[:profiles][:all])
           @parent_key = make_parent_key(@doc, parent_key_prefix)
-          @hash = make_hash(@doc, num)
+          @hash = make_hash(@doc, number_format: num)
         end
 
         def yaml_title
-          normalize_str(@title)
+          normalize_string(@title)
         end
 
         # Convert the Hiera object to a hash
@@ -92,16 +95,16 @@ module AbideDevUtils
 
         attr_accessor :doc, :hash, :parent_key, :profiles
 
-        # Accepts a path to an xccdf xml file and returns a parsed Nokogiri object of the file
-        # @param xccdf_file [String] path to an xccdf xml file
-        # @return [Nokogiri::Node] A Nokogiri node object of the XML document
-        def parse(xccdf_file)
-          raise AbideDevUtils::Errors::FileNotFoundError, xccdf_file unless File.file?(xccdf_file)
+        # # Accepts a path to an xccdf xml file and returns a parsed Nokogiri object of the file
+        # # @param xccdf_file [String] path to an xccdf xml file
+        # # @return [Nokogiri::Node] A Nokogiri node object of the XML document
+        # def parse(xccdf_file)
+        #   raise AbideDevUtils::Errors::FileNotFoundError, xccdf_file unless File.file?(xccdf_file)
 
-          Nokogiri.XML(File.open(xccdf_file))
-        end
+        #   Nokogiri.XML(File.open(xccdf_file))
+        # end
 
-        def make_hash(doc, num)
+        def make_hash(doc, number_format: false)
           hash = { 'title' => @title, 'version' => @version }
           profiles = doc.xpath('xccdf:Benchmark/xccdf:Profile')
           profiles.each do |p|
@@ -109,49 +112,49 @@ module AbideDevUtils
             hash[title.to_s] = []
             selects = p.xpath('./xccdf:select')
             selects.each do |s|
-              hash[title.to_s] << normalize_ctrl_name(s['idref'].to_s, num)
+              hash[title.to_s] << normalize_control_name(s['idref'].to_s, number_format: number_format)
             end
           end
           hash
         end
 
-        def normalize_str(str)
-          nstr = str.downcase
-          nstr.gsub!(/[^a-z0-9]$/, '')
-          nstr.gsub!(/^[^a-z]/, '')
-          nstr.gsub!(/^(l1_|l2_|ng_)/, '')
-          nstr.delete!('(/|\\|\+)')
-          nstr.gsub!(UNDERSCORED, '_')
-          nstr.strip!
-          nstr
-        end
+        # def normalize_str(str)
+        #   nstr = str.downcase
+        #   nstr.gsub!(/[^a-z0-9]$/, '')
+        #   nstr.gsub!(/^[^a-z]/, '')
+        #   nstr.gsub!(/^(l1_|l2_|ng_)/, '')
+        #   nstr.delete!('(/|\\|\+)')
+        #   nstr.gsub!(UNDERSCORED, '_')
+        #   nstr.strip!
+        #   nstr
+        # end
 
-        def normalize_profile_name(prof)
-          prof_name = normalize_str("profile_#{prof}")
-          prof_name.gsub!(NEXT_GEN_WINDOWS, 'ngws')
-          prof_name.strip!
-          prof_name
-        end
+        # def normalize_profile_name(prof)
+        #   prof_name = normalize_str("profile_#{prof}")
+        #   prof_name.gsub!(NEXT_GEN_WINDOWS, 'ngws')
+        #   prof_name.strip!
+        #   prof_name
+        # end
 
-        def normalize_ctrl_name(ctrl, num)
-          return num_normalize_ctrl(ctrl) if num
+        # def normalize_ctrl_name(ctrl, num)
+        #   return num_normalize_ctrl(ctrl) if num
 
-          name_normalize_ctrl(ctrl)
-        end
+        #   name_normalize_ctrl(ctrl)
+        # end
 
-        def name_normalize_ctrl(ctrl)
-          new_ctrl = ctrl.split('benchmarks_rule_')[-1].gsub(CONTROL_PREFIX, '')
-          normalize_str(new_ctrl)
-        end
+        # def name_normalize_ctrl(ctrl)
+        #   new_ctrl = ctrl.split('benchmarks_rule_')[-1].gsub(CONTROL_PREFIX, '')
+        #   normalize_str(new_ctrl)
+        # end
 
-        def num_normalize_ctrl(ctrl)
-          part = ctrl.split('benchmarks_rule_')[-1]
-          numpart = CONTROL_PREFIX.match(part).to_s.chop.gsub(UNDERSCORED, '_')
-          "c#{numpart}"
-        end
+        # def num_normalize_ctrl(ctrl)
+        #   part = ctrl.split('benchmarks_rule_')[-1]
+        #   numpart = CONTROL_PREFIX.match(part).to_s.chop.gsub(UNDERSCORED, '_')
+        #   "c#{numpart}"
+        # end
 
         def make_parent_key(doc, prefix)
-          doc_title = normalize_str(doc.xpath(XPATHS[:benchmark][:title]).children.to_s)
+          doc_title = normalize_string(doc.xpath(CIS_XPATHS[:benchmark][:title]).children.to_s)
           return doc_title if prefix.nil?
 
           sepped_prefix = prefix.end_with?('::') ? prefix : "#{prefix}::"
