@@ -4,16 +4,16 @@ require 'json'
 require 'pathname'
 require 'yaml'
 require 'puppet_pal'
-require 'abide_dev_utils/ppt'
+require 'abide_dev_utils/ppt/class_utils'
 
 module AbideDevUtils
   module Ppt
     class CoverageReport
-      include AbideDevUtils::Ppt
+      include AbideDevUtils::Ppt::ClassUtils
       def self.generate(puppet_class_dir, hiera_path, profile = nil)
         coverage = {}
         coverage['classes'] = {}
-        all_cap = AbideDevUtils::Ppt.find_all_classes_and_paths(puppet_class_dir)
+        all_cap = find_all_classes_and_paths(puppet_class_dir)
         invalid_classes = find_invalid_classes(all_cap)
         valid_classes = find_valid_classes(all_cap, invalid_classes)
         coverage['classes']['invalid'] = invalid_classes

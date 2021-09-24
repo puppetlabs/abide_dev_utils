@@ -28,6 +28,10 @@ module Abide
       LONGCMD
       CMD_COMPLY_URL = 'The URL (including https://) of Puppet Comply'
       CMD_COMPLY_PASSWORD = 'The password for Puppet Comply'
+      OPT_TIMEOUT_DESC = <<~EOTO
+        The number of seconds you would like requests to wait before timing out. Defaults
+        to 10 seconds.
+      EOTO
       OPT_STATUS_DESC = <<~EODESC
         A comma-separated list of check statuses to ONLY include in the report.
         Valid statuses are: pass, fail, error, notapplicable, notchecked, unknown, informational
@@ -50,19 +54,26 @@ module Abide
         options.on('-u [USERNAME]', '--username [USERNAME]', 'The username for Comply (defaults to comply)') do |u|
           @data[:username] = u
         end
-        options.on('-s [STATUS]', '--status [STATUS]', OPT_STATUS_DESC) do |s|
-          status_array = s.nil? ? nil : s.split(',').map(&:downcase)
-          status_array&.map! { |i| i == 'notchecked' ? 'not checked' : i }
-          @data[:status] = status_array
+        options.on('-t [SECONDS]', '--timeout [SECONDS]', OPT_TIMEOUT_DESC) do |t|
+          @data[:timeout] = t
         end
-        options.on('-O [CERTNAME]', '--only [CERTNAME]', OPT_ONLY_NODES) do |o|
-          only_array = o.nil? ? nil : s.split(',').map(&:downcase)
-          @data[:only] = only_array
+        options.on('-s x,y,z', '--status x,y,x',
+                   %w[pass fail error notapplicable notchecked unknown informational],
+                   Array,
+                   OPT_STATUS_DESC) do |s|
+          s&.map! { |i| i == 'notchecked' ? 'not checked' : i }
+          @data[:status] = s
         end
-        options.on('-I [CERTNAME]', '--ignore [CERTNAME]', OPT_IGNORE_NODES) do |i|
-          ignore_array = i.nil? ? nil : i.split(',').map(&:downcase)
-          @data[:ignore] = ignore_array
+        options.on('--only x,y,z', Array, OPT_ONLY_NODES) do |o|
+          @data[:onlylist] = o
         end
+        options.on('--ignore x,y,z', Array, OPT_IGNORE_NODES) do |i|
+          @data[:ignorelist] = i
+        end
+        # options.on('-R', '--[no-]regression-test', OPT_REGRESSION_TEST) do |r|
+        #   @data[:regression] = r
+        # end
+        # options.on('--')
       end
 
       def help_arguments
@@ -79,16 +90,7 @@ module Abide
         conf = config_section('comply')
         comply_url = conf.fetch(:url) if comply_url.nil?
         comply_password = comply_password.nil? ? conf.fetch(:password, Abide::CLI::PROMPT.password) : comply_password
-        username = @data.fetch(:username, nil).nil? ? conf.fetch(:username, 'comply') : @data[:username]
-        status = @data.fetch(:status, nil).nil? ? conf.fetch(:status, nil) : @data[:status]
-        ignorelist = @data.fetch(:ignore, nil).nil? ? conf.fetch(:ignore, nil) : @data[:ignore]
-        onlylist = @data.fetch(:only, nil).nil? ? conf.fetch(:only, nil) : @data[:only]
-        report = AbideDevUtils::Comply.scan_report(comply_url,
-                                                   comply_password,
-                                                   username: username,
-                                                   status: status,
-                                                   ignorelist: ignorelist,
-                                                   onlylist: onlylist)
+        report = AbideDevUtils::Comply.build_report(comply_url, comply_password, conf, **@data)
         outfile = @data.fetch(:file, nil).nil? ? conf.fetch(:report_path, 'comply_scan_report.yaml') : @data[:file]
         Abide::CLI::OUTPUT.yaml(report, file: outfile)
       end

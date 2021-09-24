@@ -24,6 +24,18 @@ module AbideDevUtils
       class FailedToCreateFileError < GenericError
         @default = 'Failed to create file:'
       end
+
+      class ClassFileNotFoundError < GenericError
+        @default = 'Class file was not found:'
+      end
+
+      class ClassDeclarationNotFoundError < GenericError
+        @default = 'Class declaration was not found:'
+      end
+
+      class InvalidClassNameError < GenericError
+        @default = 'Not a valid Puppet class name:'
+      end
     end
   end
 end
