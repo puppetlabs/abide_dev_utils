@@ -8,9 +8,13 @@ module AbideDevUtils
       raise AbideDevUtils::Errors::FileNotFoundError, path unless File.exist?(path)
     end
 
-    def self.file(path)
+    def self.file(path, extension: nil)
       filesystem_path(path)
       raise AbideDevUtils::Errors::PathNotFileError, path unless File.file?(path)
+      return if extension.nil?
+
+      file_ext = extension.match?(/^\.[A-Za-z0-9]+$/) ? extension : ".#{extension}"
+      raise AbideDevUtils::Errors::FileExtensionIncorrectError, extension unless File.extname(path) == file_ext
     end
 
     def self.directory(path)

@@ -29,6 +29,11 @@ module AbideDevUtils
       @default = 'Path is not a directory:'
     end
 
+    # Raised when a file extension is not correct
+    class FileExtensionIncorrectError < GenericError
+      @default = 'File extension does not match specified extension:'
+    end
+
     # Raised when a searched for service is not found in the parser
     class ServiceNotFoundError < GenericError
       @default = 'Service not found:'

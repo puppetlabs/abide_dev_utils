@@ -80,31 +80,30 @@ module AbideDevUtils
 
     def self.add_cis_comment(path, xccdf, number_format: false)
       require 'abide_dev_utils/xccdf'
-      utils = AbideDevUtils::XCCDF::UtilsObject
-      parsed_xccdf = utils.parse(xccdf)
-      return add_cis_comment_to_all(path, parsed_xccdf, utils, number_format: number_format) if File.directory?(path)
-      return add_cis_comment_to_single(path, parsed_xccdf, utils, number_format: number_format) if File.file?(path)
+
+      parsed_xccdf = AbideDevUtils::XCCDF::Benchmark.new(xccdf)
+      return add_cis_comment_to_all(path, parsed_xccdf, number_format: number_format) if File.directory?(path)
+      return add_cis_comment_to_single(path, parsed_xccdf, number_format: number_format) if File.file?(path)
 
       raise AbideDevUtils::Errors::FileNotFoundError, path
     end
 
-    def self.add_cis_comment_to_single(path, xccdf, utils, number_format: false)
+    def self.add_cis_comment_to_single(path, xccdf, number_format: false)
       write_cis_comment_to_file(
         path,
         cis_recommendation_comment(
           path,
-          utils.all_cis_recommendations(xccdf),
-          number_format,
-          utils
+          xccdf.all_cis_recommendations,
+          number_format
         )
       )
     end
 
-    def self.add_cis_comment_to_all(path, xccdf, utils, number_format: false)
+    def self.add_cis_comment_to_all(path, xccdf, number_format: false)
       comments = {}
-      recommendations = utils.all_cis_recommendations(xccdf)
+      recommendations = xccdf.all_cis_recommendations
       Dir[File.join(path, '*.pp')].each do |puppet_file|
-        comment = cis_recommendation_comment(puppet_file, recommendations, number_format, utils)
+        comment = cis_recommendation_comment(puppet_file, recommendations, number_format, xccdf)
         comments[puppet_file] = comment unless comment.nil?
       end
       comments.each do |key, value|
@@ -136,8 +135,8 @@ module AbideDevUtils
       end
     end
 
-    def self.cis_recommendation_comment(puppet_file, recommendations, number_format, utils)
-      reco_text = utils.find_cis_recommendation(
+    def self.cis_recommendation_comment(puppet_file, recommendations, number_format, xccdf)
+      reco_text = xccdf.find_cis_recommendation(
         File.basename(puppet_file, '.pp'),
         recommendations,
         number_format: number_format

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'abide_dev_utils/cli/abstract'
 require 'abide_dev_utils/xccdf'
 
 module Abide
@@ -14,6 +15,7 @@ module Abide
         long_desc(CMD_LONG)
         add_command(CmdParse::HelpCommand.new, default: true)
         add_command(XccdfToHieraCommand.new)
+        add_command(XccdfDiffCommand.new)
       end
     end
 
@@ -46,6 +48,24 @@ module Abide
       def to_hiera(xccdf_file)
         xfile = AbideDevUtils::XCCDF.to_hiera(xccdf_file, @data)
         Abide::CLI::OUTPUT.yaml(xfile, console: @data[:file].nil?, file: @data[:file])
+      end
+    end
+
+    class XccdfDiffCommand < AbideCommand
+      CMD_NAME = 'diff'
+      CMD_SHORT = 'Generates a diff report between two XCCDF files'
+      CMD_LONG = 'Generates a diff report between two XCCDF files'
+      CMD_FILE1_ARG = 'path to first XCCDF file'
+      CMD_FILE2_ARG = 'path to second XCCDF file'
+      def initialize
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
+        argument_desc(FILE1: CMD_FILE1_ARG, FILE2: CMD_FILE2_ARG)
+        options.on('-o [PATH]', '--out-file', 'Save the report as a yaml file') { |x| @data[:outfile] = x }
+        options.on('-p [PROFILE]', '--profile', 'Only diff and specific profile in the benchmarks') { |x| @data[:profile] = x }
+      end
+
+      def execute(file1, file2)
+        AbideDevUtils::XCCDF.diff(file1, file2, **@data)
       end
     end
   end
