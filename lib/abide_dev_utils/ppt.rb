@@ -93,7 +93,7 @@ module AbideDevUtils
         path,
         cis_recommendation_comment(
           path,
-          xccdf.all_cis_recommendations,
+          xccdf,
           number_format
         )
       )
@@ -101,9 +101,8 @@ module AbideDevUtils
 
     def self.add_cis_comment_to_all(path, xccdf, number_format: false)
       comments = {}
-      recommendations = xccdf.all_cis_recommendations
       Dir[File.join(path, '*.pp')].each do |puppet_file|
-        comment = cis_recommendation_comment(puppet_file, recommendations, number_format, xccdf)
+        comment = cis_recommendation_comment(puppet_file, xccdf, number_format)
         comments[puppet_file] = comment unless comment.nil?
       end
       comments.each do |key, value|
@@ -119,9 +118,7 @@ module AbideDevUtils
         File.open(tempfile, 'w') do |nf|
           nf.write("#{comment}\n")
           File.foreach(path) do |line|
-            next if line.match?(/#{comment}/)
-
-            nf << line
+            nf.write(line) unless line == "#{comment}\n"
           end
         end
         File.rename(path, "#{path}.old")
@@ -135,17 +132,17 @@ module AbideDevUtils
       end
     end
 
-    def self.cis_recommendation_comment(puppet_file, recommendations, number_format, xccdf)
-      reco_text = xccdf.find_cis_recommendation(
+    def self.cis_recommendation_comment(puppet_file, xccdf, number_format)
+      _, control = xccdf.find_cis_recommendation(
         File.basename(puppet_file, '.pp'),
-        recommendations,
         number_format: number_format
       )
-      if reco_text.nil?
+      if control.nil?
         AbideDevUtils::Output.simple("Could not find recommendation text for #{puppet_file}...")
         return nil
       end
-      "# #{reco_text}"
+      control_title = xccdf.resolve_control_reference(control).xpath('./xccdf:title').text
+      "# #{control_title}"
     end
   end
 end

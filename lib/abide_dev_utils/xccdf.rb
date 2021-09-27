@@ -49,11 +49,11 @@ module AbideDevUtils
       }.freeze
       CONTROL_PREFIX = /^[\d.]+_/.freeze
       UNDERSCORED = /(\s|\(|\)|-|\.)/.freeze
-      CIS_NEXT_GEN_WINDOWS = /(next_generation_windows_security)/.freeze
+      CIS_NEXT_GEN_WINDOWS = /[Nn]ext_[Gg]eneration_[Ww]indows_[Ss]ecurity/.freeze
       CIS_CONTROL_NUMBER = /([0-9.]+[0-9]+)/.freeze
-      CIS_LEVEL_CODE = /([Ll]1|[Ll]2|NG|ng|BL|bl)/.freeze
+      CIS_LEVEL_CODE = /(?:_?([Ll]evel_[0-9]|[Ll]1|[Ll]2|NG|ng|BL|bl|#{CIS_NEXT_GEN_WINDOWS}))/.freeze
       CIS_CONTROL_PARTS = /#{CIS_CONTROL_NUMBER}_+#{CIS_LEVEL_CODE}_+([A-Za-z].*)/.freeze
-      CIS_PROFILE_PARTS = /[A-Za-z_]+#{CIS_LEVEL_CODE}[_-]+([A-Za-z].*)/.freeze
+      CIS_PROFILE_PARTS = /#{CIS_LEVEL_CODE}[_-]+([A-Za-z].*)/.freeze
 
       def xpath(path)
         @xml.xpath(path)
@@ -103,7 +103,9 @@ module AbideDevUtils
       end
 
       def profile_parts(profile)
-        control_profile_text(profile).match(CIS_PROFILE_PARTS)[1..2]
+        parts = control_profile_text(profile).match(CIS_PROFILE_PARTS)[1..2]
+        parts[0].gsub!(/[Ll]evel_/, 'L')
+        parts
       end
 
       def control_parts(control)
@@ -182,13 +184,11 @@ module AbideDevUtils
         profiles.select { |x| x.title == profile_title }.controls
       end
 
-      def all_cis_recommendations
-        controls
-      end
-
       def find_cis_recommendation(name, number_format: false)
-        controls.each do |ctrl|
-          return ctrl if normalize_control_name(ctrl, number_format: number_format) == name
+        profiles.each do |profile|
+          profile.controls.each do |ctrl|
+            return [profile, ctrl] if normalize_control_name(ctrl, number_format: number_format) == name
+          end
         end
       end
 
@@ -225,6 +225,10 @@ module AbideDevUtils
         hash.to_yaml
       end
 
+      def resolve_control_reference(control)
+        xpath("//xccdf:Rule[@id='#{control.reference}']")
+      end
+
       private
 
       def parse(path)
@@ -249,13 +253,9 @@ module AbideDevUtils
       end
 
       def find_profile_names
-        names = []
-        profiles.each do |level, profs|
-          profs.each do |name, _|
-            names << "#{level} #{name}"
-          end
+        profiles.each_with_object([]) do |profile, ary|
+          ary << "#{profile.level} #{profile.plain_text_title}"
         end
-        names
       end
 
       def hiera_controls_for_profile(profile, number_format)
@@ -409,11 +409,17 @@ module AbideDevUtils
         @hash.inspect
       end
 
+      def reference
+        @reference ||= @element_type == 'control' ? @xml['idref'] : @xml['id']
+      end
+
       def hiera_title(**opts)
         send("normalize_#{@element_type}_name".to_sym, @xml, **opts)
       end
 
       private
+
+      attr_reader :xml
 
       def properties(*plain_props, **props)
         plain_props.each { |x| props[x] = nil }
@@ -430,7 +436,8 @@ module AbideDevUtils
       def initialize(profile)
         super(profile)
         @level, @title = profile_parts(control_profile_text(profile))
-        properties :title, :level, controls: :to_h
+        @plain_text_title = @xml.xpath('./xccdf:title').text
+        properties :title, :level, :plain_text_title, controls: :to_h
       end
 
       def controls
