@@ -39,15 +39,9 @@ module Abide
 
       def execute(xccdf_file)
         @data[:type] = 'cis' if @data[:type].nil?
-
-        to_hiera(xccdf_file)
-      end
-
-      private
-
-      def to_hiera(xccdf_file)
-        xfile = AbideDevUtils::XCCDF.to_hiera(xccdf_file, @data)
-        Abide::CLI::OUTPUT.yaml(xfile, console: @data[:file].nil?, file: @data[:file])
+        outfile = @data.fetch(:file, nil)
+        hfile = AbideDevUtils::XCCDF.to_hiera(xccdf_file, @data)
+        Abide::CLI::OUTPUT.yaml(hfile, console: outfile.nil?, file: outfile)
       end
     end
 
@@ -61,11 +55,15 @@ module Abide
         super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
         argument_desc(FILE1: CMD_FILE1_ARG, FILE2: CMD_FILE2_ARG)
         options.on('-o [PATH]', '--out-file', 'Save the report as a yaml file') { |x| @data[:outfile] = x }
-        options.on('-p [PROFILE]', '--profile', 'Only diff and specific profile in the benchmarks') { |x| @data[:profile] = x }
+        options.on('-p [PROFILE]', '--profile', 'Only diff and specific profile in the benchmarks') do |x|
+          @data[:profile] = x
+        end
+        options.on('-q', '--quiet', 'Show no output in the terminal') { @data[:quiet] = false }
       end
 
       def execute(file1, file2)
-        AbideDevUtils::XCCDF.diff(file1, file2, **@data)
+        diffreport = AbideDevUtils::XCCDF.diff(file1, file2, **@data)
+        AbideDevUtils::Output.yaml(diffreport, console: @data.fetch(:quiet, true), file: @data.fetch(:outfile, nil))
       end
     end
   end

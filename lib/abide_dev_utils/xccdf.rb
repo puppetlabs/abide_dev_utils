@@ -8,40 +8,43 @@ require 'abide_dev_utils/errors'
 require 'abide_dev_utils/output'
 
 module AbideDevUtils
+  # Contains modules and classes for working with XCCDF files
   module XCCDF
+    # Converts and xccdf file to a Hiera representation
     def self.to_hiera(xccdf_file, opts = {})
       type = opts.fetch(:type, 'cis')
       case type.downcase
       when 'cis'
-        Hiera.new(xccdf_file, parent_key_prefix: opts[:parent_key_prefix], num: opts[:num])
+        Benchmark.new(xccdf_file).to_hiera(**opts)
       else
         AbideDevUtils::Output.simple("XCCDF type #{type} is unsupported!")
       end
     end
 
+    # Diffs two xccdf files
     def self.diff(file1, file2, **opts)
       bm1 = Benchmark.new(file1)
       bm2 = Benchmark.new(file2)
       profile = opts.fetch(:profile, nil).nil?
-      diffreport = if profile.nil?
-                     bm1.diff(bm2)
-                   else
-                     bm1.profiles.search_title(profile).diff(bm2.profiles.search_title(profile))
-                   end
-      AbideDevUtils::Output.yaml(diffreport, console: true, file: opts.fetch(:outfile, nil))
+      return bm1.diff(bm2) if profile.nil?
+
+      bm1.profiles.search_title(profile).diff(bm2.profiles.search_title(profile))
     end
 
+    # Common constants and methods included by nearly everything else
     module Common
-      CIS_XPATHS = {
+      XPATHS = {
         benchmark: {
           all: 'xccdf:Benchmark',
           title: 'xccdf:Benchmark/xccdf:title',
           version: 'xccdf:Benchmark/xccdf:version'
         },
-        profiles: {
-          all: 'xccdf:Benchmark/xccdf:Profile',
-          relative_title: './xccdf:title',
-          relative_select: './xccdf:select'
+        cis: {
+          profiles: {
+            all: 'xccdf:Benchmark/xccdf:Profile',
+            relative_title: './xccdf:title',
+            relative_select: './xccdf:select'
+          }
         }
       }.freeze
       CONTROL_PREFIX = /^[\d.]+_/.freeze
@@ -61,19 +64,21 @@ module AbideDevUtils
       end
 
       def normalize_string(str)
-        nstr = str.downcase
+        nstr = str.dup.downcase
         nstr.gsub!(/[^a-z0-9]$/, '')
         nstr.gsub!(/^[^a-z]/, '')
-        nstr.gsub!(/^([Ll]1_|[Ll]2_|ng_)/, '')
+        nstr.gsub!(/(_[Ll]1_|_[Ll]2_|_ng_)/, '')
         nstr.delete!('(/|\\|\+)')
         nstr.gsub!(UNDERSCORED, '_')
         nstr.strip!
         nstr
       end
 
-      def normalize_profile_name(prof)
-        prof_name = normalize_string("profile_#{prof}")
+      def normalize_profile_name(prof, **_opts)
+        prof_name = normalize_string("profile_#{control_profile_text(prof)}").dup
         prof_name.gsub!(CIS_NEXT_GEN_WINDOWS, 'ngws')
+        prof_name.delete_suffix!('_environment_general_use')
+        prof_name.delete_suffix!('sensitive_data_environment_limited_functionality')
         prof_name.strip!
         prof_name
       end
@@ -140,107 +145,7 @@ module AbideDevUtils
       end
     end
 
-    # Creates a Hiera structure by parsing a CIS XCCDF benchmark
-    # @!attribute [r] title
-    # @!attribute [r] version
-    # @!attribute [r] yaml_title
-    class Hiera
-      include AbideDevUtils::XCCDF::Common
-
-      attr_reader :title, :version
-
-      # Creates a new Hiera object
-      # @param xccdf_file [String] path to an XCCDF file
-      # @param parent_key_prefix [String] a string to be prepended to the
-      #   top-level key in the Hiera structure. Useful for namespacing
-      #   the top-level key.
-      def initialize(xccdf_file, parent_key_prefix: nil, num: false)
-        @doc = parse(xccdf_file)
-        @title = xpath(CIS_XPATHS[:benchmark][:title]).children.to_s
-        @version = xpath(CIS_XPATHS[:benchmark][:version]).children.to_s
-        @profiles = xpath(CIS_XPATHS[:profiles][:all])
-        @parent_key = make_parent_key(@doc, parent_key_prefix)
-        @hash = make_hash(@doc, number_format: num)
-      end
-
-      def yaml_title
-        normalize_string(@title)
-      end
-
-      # Convert the Hiera object to a hash
-      # @return [Hash]
-      def to_h
-        @hash
-      end
-
-      # Convert the Hiera object to a string
-      # @return [String]
-      def to_s
-        @hash.inspect
-      end
-
-      # Convert the Hiera object to YAML string
-      # @return [String] YAML-formatted string
-      def to_yaml
-        yh = @hash.transform_keys do |k|
-          [@parent_key, k].join('::').strip
-        end
-        yh.to_yaml
-      end
-
-      # If a method gets called on the Hiera object which is not defined,
-      # this sends that method call to hash, then doc, then super.
-      def method_missing(method, *args, &block)
-        return true if ['exist?', 'exists?'].include?(method.to_s)
-
-        return @hash.send(method, *args, &block) if @hash.respond_to?(method)
-
-        return @doc.send(method, *args, &block) if @doc.respond_to?(method)
-
-        super(method, *args, &block)
-      end
-
-      # Checks the respond_to? of hash, doc, or super
-      def respond_to_missing?(method_name, include_private = false)
-        return true if ['exist?', 'exists?'].include?(method_name.to_s)
-
-        @hash || @doc || super
-      end
-
-      private
-
-      attr_accessor :doc, :hash, :parent_key, :profiles
-
-      def parse(path)
-        validate_xccdf(path)
-        Nokogiri::XML(File.open(File.expand_path(path))) do |config|
-          config.strict.noblanks.norecover
-        end
-      end
-
-      def make_hash(doc, number_format: false)
-        hash = { 'title' => @title, 'version' => @version }
-        profiles = doc.xpath('xccdf:Benchmark/xccdf:Profile')
-        profiles.each do |p|
-          title = normalize_profile_name(p.xpath('./xccdf:title').children.to_s)
-          hash[title.to_s] = []
-          selects = p.xpath('./xccdf:select')
-          selects.each do |s|
-            hash[title.to_s] << normalize_control_name(s['idref'].to_s, number_format: number_format)
-          end
-        end
-        hash
-      end
-
-      def make_parent_key(doc, prefix)
-        doc_title = normalize_string(doc.xpath(CIS_XPATHS[:benchmark][:title]).children.to_s)
-        return doc_title if prefix.nil?
-
-        sepped_prefix = prefix.end_with?('::') ? prefix : "#{prefix}::"
-        "#{sepped_prefix.chomp}#{doc_title}"
-      end
-    end
-
+    # Class representation of an XCCDF benchmark
     class Benchmark
       include AbideDevUtils::XCCDF::Common
 
@@ -303,6 +208,23 @@ module AbideDevUtils
         controls.diff(other.controls)
       end
 
+      # Converts object to a Hiera YAML string
+      # @return [String] YAML-formatted string
+      def to_hiera(parent_key: nil, control_number_format: false, levels: [], titles: [])
+        hash = { 'title' => title, 'version' => version }
+        hiera_parent_key = make_hiera_parent_key(parent_key)
+        profiles.each do |profile|
+          next unless levels.empty? || levels.include?(profile.level)
+          next unless titles.empty? || titles.include?(profile.title)
+
+          hash[profile.hiera_title] = hiera_controls_for_profile(profile, control_number_format)
+        end
+        hash.transform_keys do |k|
+          [hiera_parent_key, k].join('::').strip
+        end
+        hash.to_yaml
+      end
+
       private
 
       def parse(path)
@@ -335,6 +257,19 @@ module AbideDevUtils
         end
         names
       end
+
+      def hiera_controls_for_profile(profile, number_format)
+        profile.controls.each_with_object([]) do |ctrl, ary|
+          ary << ctrl.hiera_title(number_format: number_format)
+        end
+      end
+
+      def make_hiera_parent_key(prefix)
+        return title if prefix.nil?
+
+        sepped_prefix = prefix.end_with?('::') ? prefix : "#{prefix}::"
+        "#{sepped_prefix.chomp}#{title}"
+      end
     end
 
     class ObjectContainer
@@ -347,9 +282,10 @@ module AbideDevUtils
 
       def method_missing(m, *args, &block)
         property = m.to_s.start_with?('search_') ? m.to_s.split('_')[-1].to_sym : nil
-        super if property.nil? || !@searchable.include?(property)
+        return search(property, *args, &block) if property && @searchable.include?(property)
+        return @object_list.send(m, *args, &block) if @object_list.respond_to?(m)
 
-        search(property, *args, &block)
+        super
       end
 
       def respond_to_missing?(m, include_private = false)
@@ -448,48 +384,65 @@ module AbideDevUtils
       end
     end
 
-    class Profile
+    class XccdfElement
       include AbideDevUtils::XCCDF::Common
 
-      attr_reader :raw_title, :title, :level, :diff_properties
+      def initialize(element)
+        @xml = element
+        @element_type = self.class.name.split('::').last.downcase
+        @raw_title = control_profile_text(element)
+      end
 
+      def to_h
+        @properties.each_with_object({}) do |pair, hash|
+          # binding.pry
+          hash[pair[0]] = if pair[1].nil?
+                            send(pair[0])
+                          else
+                            obj = send(pair[0])
+                            obj.send(pair[1])
+                          end
+        end
+      end
+
+      def to_s
+        @hash.inspect
+      end
+
+      def hiera_title(**opts)
+        send("normalize_#{@element_type}_name".to_sym, @xml, **opts)
+      end
+
+      private
+
+      def properties(*plain_props, **props)
+        plain_props.each { |x| props[x] = nil }
+        props.transform_keys!(&:to_sym)
+        self.class.class_eval do
+          attr_reader :raw_title, :diff_properties, *plain_props
+        end
+        @diff_properties = props.keys
+        @properties = props
+      end
+    end
+
+    class Profile < XccdfElement
       def initialize(profile)
-        @xml = profile
-        @raw_title = control_profile_text(profile)
+        super(profile)
         @level, @title = profile_parts(control_profile_text(profile))
+        properties :title, :level, controls: :to_h
       end
 
       def controls
         @controls ||= Controls.new(xpath('./xccdf:select'))
       end
-
-      def to_h
-        {
-          title: title,
-          level: level,
-          controls: controls.to_h
-        }
-      end
     end
 
-    class Control
-      include AbideDevUtils::XCCDF::Common
-
-      attr_reader :raw_title, :number, :level, :title, :diff_properties
-
+    class Control < XccdfElement
       def initialize(control)
-        @xml = control
-        @raw_title = control_profile_text(control)
+        super(control)
         @number, @level, @title = control_parts(control_profile_text(control))
-        @diff_properties = %i[number level title]
-      end
-
-      def to_h
-        {
-          number: number,
-          level: level,
-          title: title
-        }
+        properties :number, :level, :title
       end
     end
   end
