@@ -11,7 +11,7 @@ module AbideDevUtils
   # Contains modules and classes for working with XCCDF files
   module XCCDF
     # Converts and xccdf file to a Hiera representation
-    def self.to_hiera(xccdf_file, opts = {})
+    def self.to_hiera(xccdf_file, opts)
       type = opts.fetch(:type, 'cis')
       case type.downcase
       when 'cis'
@@ -22,10 +22,10 @@ module AbideDevUtils
     end
 
     # Diffs two xccdf files
-    def self.diff(file1, file2, **opts)
+    def self.diff(file1, file2, opts)
       bm1 = Benchmark.new(file1)
       bm2 = Benchmark.new(file2)
-      profile = opts.fetch(:profile, nil).nil?
+      profile = opts.fetch(:profile, nil)
       return bm1.diff(bm2) if profile.nil?
 
       bm1.profiles.search_title(profile).diff(bm2.profiles.search_title(profile))
@@ -160,6 +160,10 @@ module AbideDevUtils
         @diff_properties = %i[title version profiles]
       end
 
+      def normalized_title
+        normalize_string(title)
+      end
+
       def profiles
         @profiles ||= Profiles.new(xpath('xccdf:Benchmark/xccdf:Profile'))
       end
@@ -208,19 +212,19 @@ module AbideDevUtils
         controls.diff(other.controls)
       end
 
-      # Converts object to a Hiera YAML string
+      # Converts object to Hiera-formatted YAML
       # @return [String] YAML-formatted string
-      def to_hiera(parent_key: nil, control_number_format: false, levels: [], titles: [])
+      def to_hiera(parent_key_prefix: nil, num: false, levels: [], titles: [], **_kwargs)
         hash = { 'title' => title, 'version' => version }
-        hiera_parent_key = make_hiera_parent_key(parent_key)
+        key_prefix = hiera_parent_key(parent_key_prefix)
         profiles.each do |profile|
           next unless levels.empty? || levels.include?(profile.level)
           next unless titles.empty? || titles.include?(profile.title)
 
-          hash[profile.hiera_title] = hiera_controls_for_profile(profile, control_number_format)
+          hash[profile.hiera_title] = hiera_controls_for_profile(profile, num)
         end
-        hash.transform_keys do |k|
-          [hiera_parent_key, k].join('::').strip
+        hash.transform_keys! do |k|
+          [key_prefix, k].join('::').strip
         end
         hash.to_yaml
       end
@@ -264,11 +268,10 @@ module AbideDevUtils
         end
       end
 
-      def make_hiera_parent_key(prefix)
-        return title if prefix.nil?
+      def hiera_parent_key(prefix)
+        return normalized_title if prefix.nil?
 
-        sepped_prefix = prefix.end_with?('::') ? prefix : "#{prefix}::"
-        "#{sepped_prefix.chomp}#{title}"
+        prefix.end_with?('::') ? "#{prefix}#{normalized_title}" : "#{prefix}::#{normalized_title}"
       end
     end
 
