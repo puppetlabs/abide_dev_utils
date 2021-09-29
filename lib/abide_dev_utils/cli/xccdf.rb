@@ -20,7 +20,7 @@ module Abide
     end
 
     class XccdfToHieraCommand < CmdParse::Command
-      CMD_NAME = 'to_hiera'
+      CMD_NAME = 'to-hiera'
       CMD_SHORT = 'Generates control coverage report'
       CMD_LONG = 'Generates report of valid Puppet classes that match with Hiera controls'
       def initialize
@@ -39,9 +39,8 @@ module Abide
 
       def execute(xccdf_file)
         @data[:type] = 'cis' if @data[:type].nil?
-        outfile = @data.fetch(:file, nil)
         hfile = AbideDevUtils::XCCDF.to_hiera(xccdf_file, @data)
-        Abide::CLI::OUTPUT.yaml(hfile, console: outfile.nil?, file: outfile)
+        AbideDevUtils::Output.yaml(hfile, console: @data[:file].nil?, file: @data[:file])
       end
     end
 
@@ -62,7 +61,7 @@ module Abide
       end
 
       def execute(file1, file2)
-        diffreport = AbideDevUtils::XCCDF.diff(file1, file2, **@data)
+        diffreport = AbideDevUtils::XCCDF.diff(file1, file2, @data)
         AbideDevUtils::Output.yaml(diffreport, console: @data.fetch(:quiet, true), file: @data.fetch(:outfile, nil))
       end
     end

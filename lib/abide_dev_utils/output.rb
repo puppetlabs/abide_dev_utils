@@ -22,9 +22,13 @@ module AbideDevUtils
     end
 
     def self.yaml(in_obj, console: false, file: nil)
-      AbideDevUtils::Validate.hashable(in_obj)
-      # Use object's #to_yaml method if it exists, convert to hash if not
-      yaml_out = in_obj.respond_to?(:to_yaml) ? in_obj.to_yaml : in_obj.to_h.to_yaml
+      yaml_out = if in_obj.is_a? String
+                   in_obj
+                 else
+                   AbideDevUtils::Validate.hashable(in_obj)
+                   # Use object's #to_yaml method if it exists, convert to hash if not
+                   in_obj.respond_to?(:to_yaml) ? in_obj.to_yaml : in_obj.to_h.to_yaml
+                 end
       simple(yaml_out) if console
       FWRITER.write_yaml(yaml_out, file: file) unless file.nil?
     end
