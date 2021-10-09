@@ -144,5 +144,12 @@ module AbideDevUtils
       control_title = xccdf.resolve_control_reference(control).xpath('./xccdf:title').text
       "# #{control_title}"
     end
+
+    def self.score_module(module_path, outfile: nil, quiet: false, checks: ['all'], **_)
+      AbideDevUtils::Output.simple 'This command is not currently implemented'
+      # require 'abide_dev_utils/ppt/score_module'
+      # score = {}
+      # score[:lint_check] = ScoreModule.lint if checks.include?('all') || checks.include?('lint')
+    end
   end
 end

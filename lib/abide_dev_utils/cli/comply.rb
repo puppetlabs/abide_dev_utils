@@ -12,6 +12,7 @@ module Abide
       def initialize
         super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: true)
         add_command(ComplyReportCommand.new)
+        add_command(ComplyCompareReportCommand.new)
       end
     end
 
@@ -57,23 +58,19 @@ module Abide
         options.on('-t [SECONDS]', '--timeout [SECONDS]', OPT_TIMEOUT_DESC) do |t|
           @data[:timeout] = t
         end
-        options.on('-s x,y,z', '--status x,y,x',
+        options.on('-s [X,Y,Z]', '--status [X,Y,Z]',
                    %w[pass fail error notapplicable notchecked unknown informational],
                    Array,
                    OPT_STATUS_DESC) do |s|
           s&.map! { |i| i == 'notchecked' ? 'not checked' : i }
           @data[:status] = s
         end
-        options.on('--only x,y,z', Array, OPT_ONLY_NODES) do |o|
+        options.on('--only [X,Y,Z]', Array, OPT_ONLY_NODES) do |o|
           @data[:onlylist] = o
         end
-        options.on('--ignore x,y,z', Array, OPT_IGNORE_NODES) do |i|
+        options.on('--ignore [X,Y,Z]', Array, OPT_IGNORE_NODES) do |i|
           @data[:ignorelist] = i
         end
-        # options.on('-R', '--[no-]regression-test', OPT_REGRESSION_TEST) do |r|
-        #   @data[:regression] = r
-        # end
-        # options.on('--')
       end
 
       def help_arguments
@@ -93,6 +90,25 @@ module Abide
         report = AbideDevUtils::Comply.build_report(comply_url, comply_password, conf, **@data)
         outfile = @data.fetch(:file, nil).nil? ? conf.fetch(:report_path, 'comply_scan_report.yaml') : @data[:file]
         Abide::CLI::OUTPUT.yaml(report, file: outfile)
+      end
+    end
+
+    class ComplyCompareReportCommand < AbideCommand
+      CMD_NAME = 'compare-report'
+      CMD_SHORT = 'Compare two Comply reports and get the differences.'
+      CMD_LONG = 'Compare two Comply reports and get the differences. Report A is compared to report B, showing what changes it would take for A to equal B.'
+      CMD_REPORT_A = 'The current Comply report yaml file'
+      CMD_REPORT_B = 'The old Comply report yaml file name or full path'
+      def initialize
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
+        argument_desc(REPORT_A: CMD_REPORT_A, REPORT_B: CMD_REPORT_B)
+        options.on('-u', '--upload-new', 'If you want to upload the new scan report') { @data[:upload] = true }
+        options.on('-s [STORAGE]', '--remote-storage [STORAGE]', 'Remote storage to upload the report to. (Only supports "gcloud")') { |x| @data[:remote_storage] = x }
+        options.on('-r [NAME]', '--name [NAME]', 'The name to upload the report as') { |x| @data[:report_name] = x }
+      end
+
+      def execute(report_a, report_b)
+        AbideDevUtils::Comply.compare_reports(report_a, report_b, @data)
       end
     end
   end
