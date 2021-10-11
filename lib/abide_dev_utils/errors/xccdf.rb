@@ -12,5 +12,13 @@ module AbideDevUtils
     class StrategyInvalidError < GenericError
       @default = 'Invalid strategy selected. Should be either \'name\' or \'num\''
     end
+
+    class ControlPartsError < GenericError
+      @default = 'Failed to extract parts from control name:'
+    end
+
+    class ProfilePartsError < GenericError
+      @default = 'Failed to extract parts from profile name:'
+    end
   end
 end

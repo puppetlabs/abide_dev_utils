@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
+require 'json'
 require 'yaml'
 require 'selenium-webdriver'
 require 'abide_dev_utils/errors/comply'
 require 'abide_dev_utils/gcloud'
 require 'abide_dev_utils/output'
 require 'abide_dev_utils/prompt'
+require 'pry'
 
 module AbideDevUtils
   # Holds module methods and a class for dealing with Puppet Comply
@@ -16,20 +18,30 @@ module AbideDevUtils
       ReportScraper.new(url, config, **opts).build_report(password)
     end
 
-    def self.check_for_regressions(url, password, config = nil, **opts)
-      current_report = build_report(url, password, config, **opts)
-      last_report = if opts.fetch(:remote_report_storage, '') == 'gcloud'
-                      fetch_report
+    def self.compare_reports(report_a, report_b, **opts)
+      report_name = opts.fetch(:report_name, nil)
+      current_report = ScanReport.new.from_yaml(report_a)
+      last_report = if opts.fetch(:remote_storage, '') == 'gcloud'
+                      report_name = report_b if report_name.nil?
+                      ScanReport.new.from_yaml(ScanReport.fetch_report(name: report_b))
                     else
-                      File.open(opts[:last_report], 'r', &:read)
+                      report_name = File.basename(report_b) if report_name.nil?
+                      ScanReport.new.from_yaml(File.read(report_b))
                     end
-      result, details = good_comparison?(report_comparison(current_report, last_report))
+      result, details = current_report.report_comparison(last_report, check_goodness: true)
       if result
-        puts 'A-OK'
+        AbideDevUtils::Output.simple('No negative differences detected...')
+        AbideDevUtils::Output.simple(JSON.pretty_generate(details))
       else
-        puts 'Uh-Oh'
-        puts details
+        AbideDevUtils::Output.simple('Negative differences detected!', stream: $stderr)
+        AbideDevUtils::Output.simple(JSON.pretty_generate(details), stream: $stderr)
       end
+      if opts.fetch(:upload, false) && !opts.fetch(:remote_storage, '').empty? && !report_name.nil?
+        AbideDevUtils::Output.simple('Uploading current report...')
+        ScanReport.upload_report(File.expand_path(report_a), name: report_name)
+        AbideDevUtils::Ouput.simple('Successfully uploaded report.')
+      end
+      result
     end
 
     # Class that uses Selenium WebDriver to gather scan reports from Puppet Comply
@@ -119,6 +131,7 @@ module AbideDevUtils
                                      --headless
                                      --test-type
                                      --disable-gpu
+                                     --no-sandbox
                                      --no-first-run
                                      --no-default-browser-check
                                      --ignore-certificate-errors
@@ -317,6 +330,8 @@ module AbideDevUtils
 
     # Contains multiple NodeScanReport objects
     class ScanReport
+      attr_reader :node_scan_reports
+
       def from_yaml(report)
         @scan_report = if report.is_a? Hash
                          report
@@ -325,7 +340,65 @@ module AbideDevUtils
                        else
                          YAML.safe_load(report)
                        end
-        build_node_scan_reports
+        @node_scan_reports = build_node_scan_reports
+        self
+      end
+
+      def to_h
+        node_scan_reports.each_with_object({}) do |node, h|
+          h[node.name] = node.hash
+        end
+      end
+
+      def to_yaml
+        to_h.to_yaml
+      end
+
+      def self.storage_bucket
+        @storage_bucket ||= AbideDevUtils::GCloud.storage_bucket
+      end
+
+      def self.fetch_report(name: 'comply_report.yaml')
+        report = storage_bucket.file(name)
+        report.download.read
+      end
+
+      def self.upload_report(report, name: 'comply_report.yaml')
+        storage_bucket.create_file(report, name)
+      end
+
+      def report_comparison(other, check_goodness: false)
+        comparison = []
+        node_scan_reports.zip(other.node_scan_reports).each do |cr, lr|
+          comparison << { cr.name => { diff: {}, node_presense: :new } } if lr.nil?
+          comparison << { lr.name => { diff: {}, node_presense: :dropped } } if cr.nil?
+          comparison << { cr.name => { diff: cr.diff(lr), node_presence: :same } } unless cr.nil? || lr.nil?
+        end
+        comparison.inject(&:merge)
+        return good_comparison?(comparison) if check_goodness
+
+        compairison
+      end
+
+      def good_comparison?(report_comparison)
+        good = true
+        not_good = {}
+        report_comparison.each do |node_report|
+          node_name = node_report.keys[0]
+          report = node_report[node_name]
+          next if report[:diff].empty?
+
+          not_good[node_name] = {}
+          unless report.dig(:diff, :passing, :other).nil?
+            good = false
+            not_good[node_name][:new_not_passing] = report[:diff][:passing][:other]
+          end
+          unless report.dig(:diff, :failing, :self).nil?
+            good = false
+            not_good[node_name][:new_failing] = report[:diff][:failing][:self]
+          end
+        end
+        [good, not_good]
       end
 
       private
@@ -341,20 +414,22 @@ module AbideDevUtils
 
     # Class representation of a Comply node scan report
     class NodeScanReport
-      attr_reader :name, :passing, :failing, :not_checked, :informational, :benchmark, :last_scan, :profile
+      attr_reader :name, :passing, :failing, :error, :not_checked, :informational, :benchmark, :last_scan, :profile
 
-      DIFF_PROPERTIES = %i[passing failing not_checked informational].freeze
+      DIFF_PROPERTIES = %i[passing failing error not_checked informational].freeze
 
       def initialize(node_name, node_hash)
         @name = node_name
         @hash = node_hash
         @passing = node_hash.dig('scan_results', 'Pass') || {}
         @failing = node_hash.dig('scan_results', 'Fail') || {}
+        @error = node_hash.dig('scan_results', 'Error') || {}
         @not_checked = node_hash.dig('scan_results', 'Not checked') || {}
         @informational = node_hash.dig('scan_results', 'Informational') || {}
         @benchmark = node_hash['benchmark']
         @last_scan = node_hash['last_scan']
         @profile = node_hash.fetch('custom_profile', nil) || node_hash.fetch('profile', nil)
+        create_equality_methods
       end
 
       def diff(other)
@@ -365,20 +440,16 @@ module AbideDevUtils
         diff
       end
 
-      def method_missing(method_name, *args, &_block)
-        case method_name
-        when method_name.match?(/^(passing|failing|not_checked|informational)_equal?$/)
-          property_equal?(method_name.delete_suffix('_equal?'), *args)
-        when method_name.match?(/^(to_h|to_yaml)$/)
-          @hash.send(method_name.to_sym)
+      private
+
+      def create_equality_methods
+        DIFF_PROPERTIES.each do |prop|
+          meth_name = "#{prop.to_s}_equal?"
+          self.class.define_method(meth_name) do |other|
+            property_equal?(prop, other)
+          end
         end
       end
-
-      def respond_to_missing?(method_name, _include_private = false)
-        method_name.match?(/^(((passing|failing|not_checked|informational)_equal?)|to_h|to_yaml)$/)
-      end
-
-      private
 
       def property_diff(property, other)
         {
@@ -388,54 +459,8 @@ module AbideDevUtils
       end
 
       def property_equal?(property, other_property)
-        send(property.to_sym) == other_property
+        send(property) == other_property
       end
-    end
-
-    def self.storage_bucket
-      @storage_bucket ||= AbideDevUtils::GCloud.storage_bucket
-    end
-
-    def self.fetch_report
-      report = storage_bucket.file('comply_report.yaml')
-      report.download.read
-    end
-
-    def self.upload_report(report)
-      file_to_upload = report.is_a?(Hash) ? report.to_yaml : report
-      storage_bucket.create_file(file_to_upload, 'comply_report.yaml')
-    end
-
-    def self.report_comparison(current, last)
-      current_report = ScanReport.new.from_yaml(current)
-      last_report = ScanReport.new.from_yaml(last)
-
-      comparison = []
-      current_report.zip(last_report).each do |cr, lr|
-        comparison << { cr.name => { diff: {}, node_presense: :new } } if lr.nil?
-        comparison << { lr.name => { diff: {}, node_presense: :dropped } } if cr.nil?
-        comparison << { cr.name => { diff: cr.diff(lr), node_presence: :same } } unless cr.nil? || lr.nil?
-      end
-      comparison.inject(&:merge)
-    end
-
-    def self.good_comparison?(report_comparison)
-      good = true
-      not_good = {}
-      report_comparison.each do |node_name, report|
-        next if report[:diff].empty?
-
-        not_good[node_name] = {}
-        unless report[:diff][:passing][:other].empty?
-          good = false
-          not_good[node_name][:new_not_passing] = report[:diff][:passing][:other]
-        end
-        unless report[:diff][:failing][:self].empty?
-          good = false
-          not_good[node_name][:new_failing] = report[:diff][:failing][:self]
-        end
-      end
-      [good, not_good]
     end
   end
 end

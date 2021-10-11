@@ -4,7 +4,7 @@ require 'yaml'
 require 'hashdiff'
 require 'nokogiri'
 require 'abide_dev_utils/validate'
-require 'abide_dev_utils/errors'
+require 'abide_dev_utils/errors/xccdf'
 require 'abide_dev_utils/output'
 
 module AbideDevUtils
@@ -51,8 +51,8 @@ module AbideDevUtils
       UNDERSCORED = /(\s|\(|\)|-|\.)/.freeze
       CIS_NEXT_GEN_WINDOWS = /[Nn]ext_[Gg]eneration_[Ww]indows_[Ss]ecurity/.freeze
       CIS_CONTROL_NUMBER = /([0-9.]+[0-9]+)/.freeze
-      CIS_LEVEL_CODE = /(?:_?([Ll]evel_[0-9]|[Ll]1|[Ll]2|NG|ng|BL|bl|#{CIS_NEXT_GEN_WINDOWS}))/.freeze
-      CIS_CONTROL_PARTS = /#{CIS_CONTROL_NUMBER}_+#{CIS_LEVEL_CODE}_+([A-Za-z].*)/.freeze
+      CIS_LEVEL_CODE = /(?:_|^)([Ll]evel_[0-9]|[Ll]1|[Ll]2|[NnBb][GgLl]|#{CIS_NEXT_GEN_WINDOWS})/.freeze
+      CIS_CONTROL_PARTS = /#{CIS_CONTROL_NUMBER}#{CIS_LEVEL_CODE}?_+([A-Za-z].*)/.freeze
       CIS_PROFILE_PARTS = /#{CIS_LEVEL_CODE}[_-]+([A-Za-z].*)/.freeze
 
       def xpath(path)
@@ -67,7 +67,7 @@ module AbideDevUtils
         nstr = str.dup.downcase
         nstr.gsub!(/[^a-z0-9]$/, '')
         nstr.gsub!(/^[^a-z]/, '')
-        nstr.gsub!(/(_[Ll]1_|_[Ll]2_|_ng_)/, '')
+        nstr.gsub!(/(?:_|^)([Ll]1_|[Ll]2_|ng_)/, '')
         nstr.delete!('(/|\\|\+)')
         nstr.gsub!(UNDERSCORED, '_')
         nstr.strip!
@@ -103,13 +103,19 @@ module AbideDevUtils
       end
 
       def profile_parts(profile)
-        parts = control_profile_text(profile).match(CIS_PROFILE_PARTS)[1..2]
-        parts[0].gsub!(/[Ll]evel_/, 'L')
-        parts
+        parts = control_profile_text(profile).match(CIS_PROFILE_PARTS)
+        raise AbideDevUtils::Errors::ProfilePartsError, profile if parts.nil?
+
+        parts[1].gsub!(/[Ll]evel_/, 'L')
+        parts[1..2]
       end
 
-      def control_parts(control)
-        control_profile_text(control).match(CIS_CONTROL_PARTS)[1..3]
+      def control_parts(control, parent_level: nil)
+        mdata = control_profile_text(control).match(CIS_CONTROL_PARTS)
+        raise AbideDevUtils::Errors::ControlPartsError, control if mdata.nil?
+
+        mdata[2] = parent_level unless parent_level.nil?
+        mdata[1..3]
       end
 
       def control_profile_text(item)
@@ -278,8 +284,8 @@ module AbideDevUtils
     class ObjectContainer
       include AbideDevUtils::XCCDF::Common
 
-      def initialize(list, object_creation_method)
-        @object_list = send(object_creation_method.to_sym, list)
+      def initialize(list, object_creation_method, *args, **kwargs)
+        @object_list = send(object_creation_method.to_sym, list, *args, **kwargs)
         @searchable = []
       end
 
@@ -398,7 +404,6 @@ module AbideDevUtils
 
       def to_h
         @properties.each_with_object({}) do |pair, hash|
-          # binding.pry
           hash[pair[0]] = if pair[1].nil?
                             send(pair[0])
                           else
@@ -428,7 +433,10 @@ module AbideDevUtils
         plain_props.each { |x| props[x] = nil }
         props.transform_keys!(&:to_sym)
         self.class.class_eval do
-          attr_reader :raw_title, :diff_properties, *plain_props
+          attr_reader :raw_title, :diff_properties
+
+          plain_props.each { |x| attr_reader x.to_sym unless respond_to?(x) }
+          props.each_key { |k| attr_reader k.to_sym unless respond_to?(k) }
         end
         @diff_properties = props.keys
         @properties = props
@@ -440,18 +448,15 @@ module AbideDevUtils
         super(profile)
         @level, @title = profile_parts(control_profile_text(profile))
         @plain_text_title = @xml.xpath('./xccdf:title').text
+        @controls = Controls.new(xpath('./xccdf:select'))
         properties :title, :level, :plain_text_title, controls: :to_h
-      end
-
-      def controls
-        @controls ||= Controls.new(xpath('./xccdf:select'))
       end
     end
 
     class Control < XccdfElement
-      def initialize(control)
+      def initialize(control, parent_level: nil)
         super(control)
-        @number, @level, @title = control_parts(control_profile_text(control))
+        @number, @level, @title = control_parts(control_profile_text(control, parent_level: parent_level))
         properties :number, :level, :title
       end
     end

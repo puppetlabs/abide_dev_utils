@@ -7,14 +7,14 @@ require "abide_dev_utils/version"
 Gem::Specification.new do |spec|
   spec.name          = "abide_dev_utils"
   spec.version       = AbideDevUtils::VERSION
-  spec.authors       = ["Heston Snodgrass"]
-  spec.email         = ["hsnodgrass3@gmail.com"]
+  spec.authors       = ["abide-team"]
+  spec.email         = ["abide-team@puppet.com"]
 
-  spec.summary       = "Helper utilities for developing Abide"
-  spec.description   = "Provides a CLI with helpful utilities for developing Abide"
-  spec.homepage      = "https://github.com/hsnodgrass/abide_dev_utils"
+  spec.summary       = "Helper utilities for developing compliance Puppet code"
+  spec.description   = "Provides a CLI with helpful utilities for developing compliance Puppet code"
+  spec.homepage      = "https://github.com/puppetlabs/abide_dev_utils"
   spec.license       = "MIT"
-  spec.required_ruby_version = Gem::Requirement.new(">= 2.5.0")
+  spec.required_ruby_version = Gem::Requirement.new(">= 2.7.0")
 
   # spec.metadata["allowed_push_host"] = "TODO: Set to 'http://mygemserver.com'"
 
@@ -39,7 +39,8 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'ruby-progressbar', '~> 1.11'
   spec.add_dependency 'selenium-webdriver', '~> 4.0.0.beta4'
   spec.add_dependency 'google-cloud-storage', '~> 1.34'
-  spec.add_dependency 'hashdiff'
+  spec.add_dependency 'hashdiff', '~> 1.0'
+  spec.add_dependency 'concurrent-ruby'
 
   # Dev dependencies
   spec.add_development_dependency 'bundler'

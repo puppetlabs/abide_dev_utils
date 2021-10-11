@@ -217,5 +217,23 @@ module Abide
         AbideDevUtils::Ppt.add_cis_comment(path, xccdf, number_format: @data.fetch(:number_format, false))
       end
     end
+
+    class PuppetScoreModuleCommand < AbideCommand
+      CMD_NAME = 'score'
+      CMD_SHORT = 'Scores a Puppet module just like Puppet Forge'
+      CMD_LONG = 'Scores a Puppet module just like Puppet Forge. This is a useful quality-check before publishing a module.'
+      def initialize
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
+        options.on('-o [PATH]', '--outfile [PATH]', 'Save results to a file') { |x| @data[:outfile] = x }
+        options.on('-q', '--quiet', FalseClass, 'Do not print results to console') { |x| @data[:quiet] = x }
+        options.on('-c', '--checks', Array, 'Comma-separated list of individual checks to run. Defaults to running all checks.') { |x| @data[:check] = x }
+        options.on('-m [PATH]', '--module [PATH]', 'Path to a Puppet module to score. Defaults to using the current directory.') { |x| @data[:module] = x }
+      end
+
+      def execute
+        module_path = @data.fetch(:module, nil)
+        AbideDevUtils::Ppt.score_module(module_path, **@data)
+      end
+    end
   end
 end
