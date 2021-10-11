@@ -39,7 +39,7 @@ module AbideDevUtils
       if opts.fetch(:upload, false) && !opts.fetch(:remote_storage, '').empty? && !report_name.nil?
         AbideDevUtils::Output.simple('Uploading current report...')
         ScanReport.upload_report(File.expand_path(report_a), name: report_name)
-        AbideDevUtils::Ouput.simple('Successfully uploaded report.')
+        AbideDevUtils::Output.simple('Successfully uploaded report.')
       end
       result
     end
