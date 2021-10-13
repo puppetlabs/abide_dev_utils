@@ -8,6 +8,10 @@ module AbideDevUtils
       class ComplyLoginFailedError < GenericError
         @default = 'Failed to login to Comply:'
       end
+
+      class WaitOnError < GenericError
+        @default = 'wait_on failed due to error:'
+      end
     end
   end
 end

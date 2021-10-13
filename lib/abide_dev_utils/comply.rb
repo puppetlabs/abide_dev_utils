@@ -46,38 +46,27 @@ module AbideDevUtils
 
     # Class that uses Selenium WebDriver to gather scan reports from Puppet Comply
     class ReportScraper
+      attr_reader :timeout,
+                  :username,
+                  :status,
+                  :ignorelist,
+                  :onlylist,
+                  :max_pagination,
+                  :screenshot_on_error,
+                  :page_source_on_error
+
       def initialize(url, config = nil, **opts)
         @url = url
         @config = config
         @opts = opts
-      end
-
-      def timeout
-        @timeout ||= fetch_option(:timeout, 10).to_i
-      end
-
-      def username
-        @username ||= fetch_option(:username, 'comply')
-      end
-
-      def status
-        @status ||= fetch_option(:status)
-      end
-
-      def ignorelist
-        @ignorelist ||= fetch_option(:ignorelist, [])
-      end
-
-      def onlylist
-        @onlylist ||= fetch_option(:onlylist, [])
-      end
-
-      def screenshot_on_error
-        @screenshot_on_error ||= fetch_option(:screenshot_on_error, true)
-      end
-
-      def page_source_on_error
-        @page_source_on_error ||= fetch_option(:page_source_on_error, true)
+        @timeout = fetch_option(:timeout, 10).to_i
+        @username = fetch_option(:username, 'comply')
+        @status = fetch_option(:status)
+        @ignorelist = fetch_option(:ignorelist, [])
+        @onlylist = fetch_option(:onlylist, [])
+        @max_pagination = fetch_option(:max_pagination, 5).to_i
+        @screenshot_on_error = fetch_option(:screenshot_on_error, false)
+        @page_source_on_error = fetch_option(:page_source_on_error, false)
       end
 
       def build_report(password)
@@ -146,27 +135,32 @@ module AbideDevUtils
         subject.find_element(**kwargs)
       end
 
-      def wait_on(ignore_nse: false, ignore: [Selenium::WebDriver::Error::NoSuchElementError], &block)
+      def wait_on(timeout: @timeout,
+                  ignore_nse: false,
+                  quit_driver: true,
+                  quiet: false,
+                  ignore: [Selenium::WebDriver::Error::NoSuchElementError],
+                  &block)
         raise 'wait_on must be passed a block' unless block
 
         value = nil
         if ignore_nse
           begin
-            Selenium::WebDriver::Wait.new(ignore: [], timeout: timeout).until do
+            Selenium::WebDriver::Wait.new(ignore: [], timeout: timeout, interval: 1).until do
               value = yield
             end
           rescue Selenium::WebDriver::Error::NoSuchElementError
             return value
-          rescue => e
-            raise_error(e)
+          rescue StandardError => e
+            raise_error(e, AbideDevUtils::Comply::WaitOnError, quit_driver: quit_driver, quiet: quiet)
           end
         else
           begin
-            Selenium::WebDriver::Wait.new(ignore: ignore, timeout: timeout).until do
+            Selenium::WebDriver::Wait.new(ignore: ignore, timeout: timeout, interval: 1).until do
               value = yield
             end
-          rescue => e
-            raise_error(e)
+          rescue StandardError => e
+            raise_error(e, AbideDevUtils::Comply::WaitOnError, quit_driver: quit_driver, quiet: quiet)
           end
         end
         value
@@ -182,20 +176,21 @@ module AbideDevUtils
         FileUtils.mkdir_p path
       end
 
-      def raise_error(err)
-        output.simple 'Something went wrong!'
+      def raise_error(original, err_class = nil, quit_driver: true, quiet: false)
+        output.simple 'Something went wrong!' unless quiet
         if screenshot_on_error
-          output.simple 'Taking a screenshot of current page state...'
+          output.simple 'Taking a screenshot of current page state...' unless quiet
           screenshot
         end
 
         if page_source_on_error
-          output.simple 'Saving page source of current page...'
+          output.simple 'Saving page source of current page...' unless quiet
           page_source
         end
 
-        driver.quit
-        raise err
+        driver.quit if quit_driver
+        actual_err_class = err_class.nil? ? original.class : err_class
+        raise actual_err_class, original.message
       end
 
       def screenshot
@@ -239,12 +234,56 @@ module AbideDevUtils
         raise ComplyLoginFailedError, error_text
       end
 
+      def filter_node_report_links(node_report_links)
+        if onlylist.empty? && ignorelist.empty?
+          output.simple 'No filters set, using all node reports...'
+          return node_report_links
+        end
+
+        unless onlylist.empty?
+          output.simple 'Onlylist found, filtering node reports...'
+          return node_report_links.select { |l| onlylist.include?(l[:name]) }
+        end
+
+        output.simple 'Ignorelist found, filtering node reports...'
+        node_report_links.reject { |l| ignorelist.include?(l[:name]) }
+      end
+
+      def find_node_report_table(subject)
+        wait_on { find_element(subject, class: 'metric-containers-failed-hosts-count') }
+        hosts = find_element(subject, class: 'metric-containers-failed-hosts-count')
+        table = find_element(hosts, class: 'rc-table')
+        wait_on { find_element(table, tag_name: 'tbody') }
+        find_element(table, tag_name: 'tbody')
+      end
+
+      def wait_for_node_report_links(table_body)
+        wait_on(timeout: 2, quit_driver: false, quiet: true) { table_body.find_element(tag_name: 'a') }
+        output.simple 'Found node report links...'
+        table_body.find_elements(tag_name: 'a')
+      rescue AbideDevUtils::Comply::WaitOnError
+        []
+      end
+
       def find_node_report_links
         output.simple 'Finding nodes with scan reports...'
-        hosts = wait_on { find_element(class: 'metric-containers-failed-hosts-count') }
-        table = find_element(hosts, class: 'rc-table')
-        table_body = find_element(table, tag_name: 'tbody')
-        wait_on { table_body.find_elements(tag_name: 'a') }
+        node_report_links = []
+        (1..max_pagination).each do |page|
+          output.simple "Trying page #{page}..."
+          driver.get("#{@url}/dashboard?page=#{page}&limit=50")
+          table_body = find_node_report_table(driver)
+          elems = wait_for_node_report_links(table_body)
+          if elems.empty?
+            output.simple "No links found on page #{page}, stopping search..."
+            break
+          end
+
+          elems.each do |elem|
+            node_report_links << { name: elem.text, url: elem.attribute('href') }
+          end
+        end
+        driver.get(@url)
+        filter_node_report_links(node_report_links)
       end
 
       def connect(password)
@@ -266,63 +305,56 @@ module AbideDevUtils
         output.simple 'Building scan reports, this may take a while...'
         all_checks = {}
         original_window = driver.window_handle
-        if !onlylist.empty?
-          node_report_links.reject! { |l| !onlylist.include?(l.text) }
-        elsif !ignorelist.empty?
-          node_report_links.reject! { |l| ignorelist.include?(l.text) }
-        end
         node_report_links.each do |link|
-          begin
-            node_name = link.text
-            new_progress(node_name)
-            link_url = link.attribute('href')
-            driver.manage.new_window(:tab)
+          node_name = link[:name]
+          link_url = link[:url]
+          new_progress(node_name)
+          driver.manage.new_window(:tab)
+          progress.increment
+          wait_on { driver.window_handles.length == 2 }
+          progress.increment
+          driver.switch_to.window driver.window_handles[1]
+          driver.get(link_url)
+          wait_on { find_element(class: 'details-scan-info') }
+          progress.increment
+          wait_on { find_element(class: 'details-table') }
+          progress.increment
+          report = { 'scan_results' => {} }
+          scan_info_table = find_element(class: 'details-scan-info')
+          scan_info_table_rows = scan_info_table.find_elements(tag_name: 'tr')
+          progress.increment
+          check_table_body = find_element(tag_name: 'tbody')
+          check_table_rows = check_table_body.find_elements(tag_name: 'tr')
+          progress.increment
+          scan_info_table_rows.each do |row|
+            key = find_element(row, tag_name: 'h5').text
+            value = find_element(row, tag_name: 'strong').text
+            report[key.downcase.tr(':', '').tr(' ', '_')] = value
             progress.increment
-            wait_on { driver.window_handles.length == 2 }
-            progress.increment
-            driver.switch_to.window driver.window_handles[1]
-            driver.get(link_url)
-            wait_on { find_element(class: 'details-scan-info') }
-            progress.increment
-            wait_on { find_element(class: 'details-table') }
-            progress.increment
-            report = { 'scan_results' => {} }
-            scan_info_table = find_element(class: 'details-scan-info')
-            scan_info_table_rows = scan_info_table.find_elements(tag_name: 'tr')
-            progress.increment
-            check_table_body = find_element(tag_name: 'tbody')
-            check_table_rows = check_table_body.find_elements(tag_name: 'tr')
-            progress.increment
-            scan_info_table_rows.each do |row|
-              key = find_element(row, tag_name: 'h5').text
-              value = find_element(row, tag_name: 'strong').text
-              report[key.downcase.tr(':', '').tr(' ', '_')] = value
-              progress.increment
-            end
-            check_table_rows.each do |row|
-              chk_objs = row.find_elements(tag_name: 'td')
-              chk_objs.map!(&:text)
-              if status.nil? || status.include?(chk_objs[1].downcase)
-                name_parts = chk_objs[0].match(/^([0-9.]+) (.+)$/)
-                key = normalize_cis_rec_name(name_parts[2])
-                unless report['scan_results'].key?(chk_objs[1])
-                  report['scan_results'][chk_objs[1]] = {}
-                end
-                report['scan_results'][chk_objs[1]][key] = {
-                  'name' => name_parts[2].chomp,
-                  'number' => name_parts[1].chomp
-                }
-              end
-              progress.increment
-            end
-            all_checks[node_name] = report
-            driver.close
-            output.simple "Created report for #{node_name}"
-          rescue => e
-            raise_error(e)
-          ensure
-            driver.switch_to.window original_window
           end
+          check_table_rows.each do |row|
+            chk_objs = row.find_elements(tag_name: 'td')
+            chk_objs.map!(&:text)
+            if status.nil? || status.include?(chk_objs[1].downcase)
+              name_parts = chk_objs[0].match(/^([0-9.]+) (.+)$/)
+              key = normalize_cis_rec_name(name_parts[2])
+              unless report['scan_results'].key?(chk_objs[1])
+                report['scan_results'][chk_objs[1]] = {}
+              end
+              report['scan_results'][chk_objs[1]][key] = {
+                'name' => name_parts[2].chomp,
+                'number' => name_parts[1].chomp
+              }
+            end
+            progress.increment
+          end
+          all_checks[node_name] = report
+          driver.close
+          output.simple "Created report for #{node_name}"
+        rescue ::StandardError => e
+          raise_error(e)
+        ensure
+          driver.switch_to.window original_window
         end
         all_checks
       end

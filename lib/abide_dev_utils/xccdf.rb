@@ -26,9 +26,18 @@ module AbideDevUtils
       bm1 = Benchmark.new(file1)
       bm2 = Benchmark.new(file2)
       profile = opts.fetch(:profile, nil)
-      return bm1.diff(bm2) if profile.nil?
-
-      bm1.profiles.search_title(profile).diff(bm2.profiles.search_title(profile))
+      profile_diff = if profile.nil?
+                       bm1.diff_profiles(bm2).each do |_, v|
+                         v.transform_values! { |x| x.map!(&:to_s) }
+                       end
+                     else
+                       bm1.diff_profiles(bm2)[profile].transform_values! { |x| x.map!(&:to_s) }
+                     end
+      profile_key = profile.nil? ? 'all_profiles' : profile
+      {
+        'benchmark' => bm1.diff_title_version(bm2),
+        profile_key => profile_diff
+      }
     end
 
     # Common constants and methods included by nearly everything else
@@ -144,8 +153,23 @@ module AbideDevUtils
         diff_properties.map { |x| send(x) } == other.diff_properties.map { |x| other.send(x) }
       end
 
-      def diff(other, similarity: 1, strict: false, strip: true, **opts)
-        Hashdiff.diff(to_h, other.to_h, similarity: similarity, strict: strict, strip: strip, **opts)
+      def default_diff_opts
+        {
+          similarity: 1,
+          strict: true,
+          strip: true,
+          array_path: true,
+          delimiter: '//',
+          use_lcs: false
+        }
+      end
+
+      def diff(other, **opts)
+        Hashdiff.diff(
+          to_h,
+          other.to_h,
+          default_diff_opts.merge(opts)
+        )
       end
 
       def abide_object?
@@ -157,7 +181,7 @@ module AbideDevUtils
     class Benchmark
       include AbideDevUtils::XCCDF::Common
 
-      attr_reader :title, :version, :diff_properties
+      attr_reader :xml, :title, :version, :diff_properties
 
       def initialize(path)
         @xml = parse(path)
@@ -210,8 +234,27 @@ module AbideDevUtils
         }
       end
 
+      def diff_title_version(other)
+        Hashdiff.diff(
+          to_h.reject { |k, _| k.to_s == 'profiles' },
+          other.to_h.reject { |k, _| k.to_s == 'profiles' },
+          default_diff_opts
+        )
+      end
+
       def diff_profiles(other)
-        profiles.diff(other.profiles)
+        this_diff = {}
+        other_hash = other.to_h[:profiles]
+        to_h[:profiles].each do |name, data|
+          diff_h = Hashdiff.diff(data, other_hash[name], default_diff_opts).each_with_object({}) do |x, a|
+            val_to = x.length == 4 ? x[3] : nil
+            a_key = x[2].is_a?(Hash) ? x[2][:title] : x[2]
+            a[a_key] = [] unless a.key?(a_key)
+            a[a_key] << ChangeSet.new(change: x[0], key: x[1], value: x[2], value_to: val_to)
+          end
+          this_diff[name] = diff_h
+        end
+        this_diff
       end
 
       def diff_controls(other)
@@ -243,7 +286,7 @@ module AbideDevUtils
 
       def parse(path)
         validate_xccdf(path)
-        Nokogiri::XML(File.open(File.expand_path(path))) do |config|
+        Nokogiri::XML.parse(File.open(File.expand_path(path))) do |config|
           config.strict.noblanks.norecover
         end
       end
@@ -281,6 +324,69 @@ module AbideDevUtils
       end
     end
 
+    class ChangeSet
+      attr_reader :change, :key, :value, :value_to
+
+      def initialize(change:, key:, value:, value_to: nil)
+        validate_change(change)
+        @change = change
+        @key = key
+        @value = value
+        @value_to = value_to
+      end
+
+      def to_s
+        val_to_str = value_to.nil? ? ' ' : " to #{value_to} "
+        "#{change_string} value #{value}#{val_to_str}at #{key}"
+      end
+
+      def can_merge?(other)
+        return false unless (change == '-' && other.change == '+') || (change == '+' && other.change == '-')
+        return false unless key == other.key || value_hash_equality(other)
+
+        true
+      end
+
+      def merge(other)
+        unless can_merge?(other)
+          raise ArgumentError, 'Cannot merge. Possible causes: change is identical; key or value do not match'
+        end
+
+        new_to_value = value == other.value ? nil : other.value
+        ChangeSet.new(
+          change: '~',
+          key: key,
+          value: value,
+          value_to: new_to_value
+        )
+      end
+
+      private
+
+      def value_hash_equality(other)
+        equality = false
+        value.each do |k, v|
+          equality = true if v == other.value[k]
+        end
+        equality
+      end
+
+      def validate_change(change)
+        raise ArgumentError, "Change type #{change} in invalid" unless ['+', '-', '~'].include?(change)
+      end
+
+      def change_string
+        case change
+        when '-'
+          'remove'
+        when '+'
+          'add'
+        else
+          'change'
+        end
+      end
+    end
+
     class ObjectContainer
       include AbideDevUtils::XCCDF::Common
 
@@ -304,9 +410,9 @@ module AbideDevUtils
       end
 
       def to_h
-        key_prop = @index.nil? ? :raw_title : @index
         @object_list.each_with_object({}) do |obj, self_hash|
-          self_hash[obj.send(key_prop)] = obj.to_h.reject { |k, _| k == key_prop }
+          key = resolve_hash_key(obj)
+          self_hash[key] = obj.to_h
         end
       end
 
@@ -328,12 +434,22 @@ module AbideDevUtils
 
       private
 
+      def resolve_hash_key(obj)
+        return obj.send(:raw_title) unless defined?(@hash_key)
+
+        @hash_key.each_with_object([]) { |x, a| a << obj.send(x) }.join('_')
+      end
+
       def searchable!(*properties)
         @searchable = properties
       end
 
       def index!(property)
         @index = property
+      end
+
+      def hash_key!(*properties)
+        @hash_key = properties
       end
     end
 
@@ -342,6 +458,7 @@ module AbideDevUtils
         super(list, :sorted_profile_classes)
         searchable! :level, :title
         index! :title
+        hash_key! :level, :title
       end
 
       def levels
@@ -366,6 +483,7 @@ module AbideDevUtils
         super(list, :sorted_control_classes)
         searchable! :level, :title, :number
         index! :number
+        hash_key! :number
       end
 
       def numbers
@@ -456,7 +574,7 @@ module AbideDevUtils
     class Control < XccdfElement
       def initialize(control, parent_level: nil)
         super(control)
-        @number, @level, @title = control_parts(control_profile_text(control, parent_level: parent_level))
+        @number, @level, @title = control_parts(control_profile_text(control), parent_level: parent_level)
         properties :number, :level, :title
       end
     end
