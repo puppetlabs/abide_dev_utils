@@ -58,6 +58,8 @@ module Abide
           @data[:profile] = x
         end
         options.on('-q', '--quiet', 'Show no output in the terminal') { @data[:quiet] = false }
+        options.on('--no-diff-profiles', 'Do not diff the profiles in the XCCDF files') { @data[:diff_profiles] = false }
+        options.on('--no-diff-controls', 'Do not diff the controls in the XCCDF files') { @data[:diff_controls] = false }
       end
 
       def execute(file1, file2)
