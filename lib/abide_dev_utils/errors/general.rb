@@ -53,5 +53,9 @@ module AbideDevUtils
     class NotHashableError < GenericError
       @default = 'Object does not respond to #to_hash or #to_h:'
     end
+
+    class CliOptionsConflict < GenericError
+      @default = "Console options conflict."
+    end
   end
 end
