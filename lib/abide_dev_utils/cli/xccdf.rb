@@ -16,6 +16,42 @@ module Abide
         add_command(CmdParse::HelpCommand.new, default: true)
         add_command(XccdfToHieraCommand.new)
         add_command(XccdfDiffCommand.new)
+        add_command(XccdfGenMapCommand.new)
+      end
+    end
+
+    class XccdfGenMapCommand < CmdParse::Command
+      CMD_NAME = 'gen-map'
+      CMD_SHORT = 'Generates mappings from XCCDF files'
+      CMD_LONG = 'Generates mappings for CEM modules from 1 or more XCCDF files as YAML'
+      def initialize
+        super(CMD_NAME, takes_commands: false)
+        short_desc(CMD_SHORT)
+        long_desc(CMD_LONG)
+        options.on('-b [TYPE]', '--benchmark-type [TYPE]', 'XCCDF Benchmark type CIS by default') { |b| @data[:type] = b }
+        options.on('-d [DIR]', '--files-output-directory [DIR]', 'Directory to save files data/mappings by default') { |d| @data[:dir] = d }
+        options.on('-q', '--quiet', 'Show no output in the terminal') { @data[:quiet] = true }
+        options.on('-p [PREFIX]', '--parent-key-prefix [PREFIX]', 'A prefix to append to the parent key') do |p|
+          @data[:parent_key_prefix] = p
+        end
+      end
+
+      def execute(xccdf_file)
+        if @data[:quiet] && !@data[:dir]
+          AbideDevUtils::Output.simple("I don\'t know how to quietly output to the console\n¯\\_(ツ)_/¯") 
+          exit 1
+        end
+        @data[:console] = true if @data[:dir].nil?
+        @data[:type] = 'cis' if @data[:type].nil?
+        @data[:parent_key_prefix] = '' if @data[:parent_key_prefix].nil?
+        hfile = AbideDevUtils::XCCDF.gen_map(xccdf_file, **@data)
+        mapping_dir = File.dirname(hfile.keys[0]) unless @data[:dir].nil?
+        AbideDevUtils::Output.simple("Creating directory #{mapping_dir}") unless @data[:quiet] || @data[:console] || @data[:dir].nil? || File.directory?(mapping_dir)
+        FileUtils.mkdir_p(mapping_dir) unless @data[:console] || @data[:dir].nil?
+        hfile.each do |key, val|
+          file_path = @data[:dir].nil? ? nil : key
+          AbideDevUtils::Output.yaml(val, console: @data[:console], file: file_path)
+        end
       end
     end
 

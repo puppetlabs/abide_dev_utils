@@ -38,6 +38,16 @@ RSpec.describe 'AbideDevUtils::XCCDF' do
     expect { AbideDevUtils::XCCDF::Benchmark.new(windows_xccdf) }.not_to raise_error
   end
 
+  it 'Creates control map from Windows XCCDF' do
+    opts = { console: true, type: 'cis', parent_key_prefix: '' }
+    expect { AbideDevUtils::XCCDF.gen_map(windows_xccdf, opts)}.not_to raise_error
+  end
+
+  it 'Creates control map from Linux XCCDF' do
+    opts = { console: true, type: 'cis', parent_key_prefix: '' }
+    expect { AbideDevUtils::XCCDF.gen_map(linux_xccdf, opts)}.not_to raise_error
+  end
+
   it 'raises FileNotFoundError when creating object Benchmark object with bad file path' do
     expect { AbideDevUtils::XCCDF::Benchmark.new('/fake/path') }.to raise_error(
       AbideDevUtils::Errors::FileNotFoundError

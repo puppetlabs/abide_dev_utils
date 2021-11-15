@@ -20,5 +20,9 @@ module AbideDevUtils
     class ProfilePartsError < GenericError
       @default = 'Failed to extract parts from profile name:'
     end
+
+    class UnsupportedXCCDFError < GenericError
+      @default = "XCCDF type is unsupported!"
+    end
   end
 end

@@ -10,6 +10,17 @@ require 'abide_dev_utils/output'
 module AbideDevUtils
   # Contains modules and classes for working with XCCDF files
   module XCCDF
+    # Generate map for CEM
+    def self.gen_map(xccdf_file, opts)
+      type = opts.fetch(:type, 'cis')
+      case type.downcase
+      when 'cis'
+        new_map = Benchmark.new(xccdf_file).gen_map(**opts)
+      else
+        raise AbideDevUtils::Errors::UnsupportedXCCDFError, "XCCDF type #{type} is unsupported!"
+      end
+    end
+
     # Converts and xccdf file to a Hiera representation
     def self.to_hiera(xccdf_file, opts)
       type = opts.fetch(:type, 'cis')
@@ -17,7 +28,7 @@ module AbideDevUtils
       when 'cis'
         Benchmark.new(xccdf_file).to_hiera(**opts)
       else
-        AbideDevUtils::Output.simple("XCCDF type #{type} is unsupported!")
+        raise AbideDevUtils::Errors::UnsupportedXCCDFError, "XCCDF type #{type} is unsupported!"
       end
     end
 
@@ -218,6 +229,20 @@ module AbideDevUtils
         profiles.select { |x| x.title == profile_title }.controls
       end
 
+      def gen_map(dir: nil, type: 'CIS', parent_key_prefix: '', **_)
+        os, ver = facter_platform
+        if dir
+          mapping_dir = File.expand_path(File.join(dir, type, os, ver))
+        else
+          mapping_dir = ''
+        end
+        parent_key_prefix = parent_key_prefix.nil? ? nil : ''
+        ['title', 'hiera_title', 'hiera_title_num', 'number'].each_with_object({}) do |idx, h|
+          map_file_path = "#{mapping_dir}/#{idx}.yaml"
+          h[map_file_path] = map_indexed(index: idx, framework: type, key_prefix: parent_key_prefix)
+        end
+      end
+
       def find_cis_recommendation(name, number_format: false)
         profiles.each do |profile|
           profile.controls.each do |ctrl|
@@ -259,6 +284,53 @@ module AbideDevUtils
 
       def diff_controls(other)
         controls.diff(other.controls)
+      end
+
+      def map_indexed(index: 'title', framework: 'cis', key_prefix: '')
+        all_indexes = ['title', 'hiera_title', 'hiera_title_num', 'number']
+
+        objserver = {}
+        objworkstation = {}
+        #mappings = [framework, index]
+        #mappings.unshift(key_prefix) unless key_prefix.empty?
+        #output = { mappings.join('::') => {} }
+        output = {}
+
+        c_map = profiles.each_with_object({}) do |profile, obj|
+          controls_hash = profile.controls.each_with_object({}) do |ctrl, hsh|
+            real_index = if index == 'hiera_title_num'
+                          ctrl.hiera_title(number_format: true)
+                        elsif index == 'title'
+                          resolve_control_reference(ctrl).xpath('./xccdf:title').text
+                        else
+                          ctrl.send(index.to_sym)
+                        end
+            controls_array = all_indexes.each_with_object([]) do |idx_sym, ary|
+              next if idx_sym == index
+    
+              item = if idx_sym == 'hiera_title_num'
+                      ctrl.hiera_title(number_format: true)
+                    elsif idx_sym == 'title'
+                      resolve_control_reference(ctrl).xpath('./xccdf:title').text
+                    else
+                      ctrl.send(idx_sym.to_sym)
+                    end
+              ary << "#{item}"
+            end
+            hsh["#{real_index.to_s}"] = controls_array.sort
+          end
+          obj[profile.level.downcase] = {} if obj[profile.level.downcase].nil? || !obj[profile.level.downcase].is_a?(Hash)
+          obj[profile.level.downcase][profile.title.downcase] = controls_hash.sort_by { |k, _| k }.to_h
+        end
+          
+        mappings = [framework, index]
+        mappings.unshift(key_prefix) unless key_prefix.empty?
+        { mappings.join('::') => c_map }.to_yaml
+      end
+
+      def facter_platform
+        cpe = xpath('xccdf:Benchmark/xccdf:platform')[0]['idref'].split(':')
+        [cpe[4].split('_')[0], cpe[5].split('.')[0]]
       end
 
       # Converts object to Hiera-formatted YAML
