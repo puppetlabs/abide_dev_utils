@@ -46,7 +46,7 @@ module Abide
         @data[:parent_key_prefix] = '' if @data[:parent_key_prefix].nil?
         hfile = AbideDevUtils::XCCDF.gen_map(xccdf_file, **@data)
         mapping_dir = File.dirname(hfile.keys[0]) unless @data[:dir].nil?
-        AbideDevUtils::Output.simple("Creating directory #{mapping_dir}") unless @data[:quiet] || @data[:console] || @data[:dir].nil?
+        AbideDevUtils::Output.simple("Creating directory #{mapping_dir}") unless @data[:quiet] || @data[:console] || @data[:dir].nil? || File.directory?(mapping_dir)
         FileUtils.mkdir_p(mapping_dir) unless @data[:console] || @data[:dir].nil?
         hfile.each do |key, val|
           file_path = @data[:dir].nil? ? nil : key

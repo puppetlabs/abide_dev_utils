@@ -288,36 +288,46 @@ module AbideDevUtils
 
       def map_indexed(index: 'title', framework: 'cis', key_prefix: '')
         all_indexes = ['title', 'hiera_title', 'hiera_title_num', 'number']
+
+        objserver = {}
+        objworkstation = {}
+        #mappings = [framework, index]
+        #mappings.unshift(key_prefix) unless key_prefix.empty?
+        #output = { mappings.join('::') => {} }
+        output = {}
+
         c_map = profiles.each_with_object({}) do |profile, obj|
           controls_hash = profile.controls.each_with_object({}) do |ctrl, hsh|
             real_index = if index == 'hiera_title_num'
-                           ctrl.hiera_title(number_format: true)
-                         elsif index == 'title'
-                           resolve_control_reference(ctrl).xpath('./xccdf:title').text
-                         else
-                           ctrl.send(index.to_sym)
-                         end
-             controls_array = all_indexes.each_with_object([]) do |idx_sym, ary|
+                          ctrl.hiera_title(number_format: true)
+                        elsif index == 'title'
+                          resolve_control_reference(ctrl).xpath('./xccdf:title').text
+                        else
+                          ctrl.send(index.to_sym)
+                        end
+            controls_array = all_indexes.each_with_object([]) do |idx_sym, ary|
               next if idx_sym == index
     
               item = if idx_sym == 'hiera_title_num'
-                       ctrl.hiera_title(number_format: true)
-                     elsif idx_sym == 'title'
-                       resolve_control_reference(ctrl).xpath('./xccdf:title').text
-                     else
-                       ctrl.send(idx_sym.to_sym)
-                     end
+                      ctrl.hiera_title(number_format: true)
+                    elsif idx_sym == 'title'
+                      resolve_control_reference(ctrl).xpath('./xccdf:title').text
+                    else
+                      ctrl.send(idx_sym.to_sym)
+                    end
               ary << "#{item}"
             end
             hsh["#{real_index.to_s}"] = controls_array.sort
           end
-          obj[profile.level.downcase] = {profile.title.downcase => controls_hash.sort_by { |k, _| k }.to_h }
+          obj[profile.level.downcase] = {} if obj[profile.level.downcase].nil? || !obj[profile.level.downcase].is_a?(Hash)
+          obj[profile.level.downcase][profile.title.downcase] = controls_hash.sort_by { |k, _| k }.to_h
         end
+          
         mappings = [framework, index]
         mappings.unshift(key_prefix) unless key_prefix.empty?
         { mappings.join('::') => c_map }.to_yaml
       end
-    
+
       def facter_platform
         cpe = xpath('xccdf:Benchmark/xccdf:platform')[0]['idref'].split(':')
         [cpe[4].split('_')[0], cpe[5].split('.')[0]]
