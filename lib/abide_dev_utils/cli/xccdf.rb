@@ -20,49 +20,60 @@ module Abide
       end
     end
 
-    class XccdfGenMapCommand < CmdParse::Command
+    class XccdfGenMapCommand < AbideCommand
       CMD_NAME = 'gen-map'
       CMD_SHORT = 'Generates mappings from XCCDF files'
       CMD_LONG = 'Generates mappings for CEM modules from 1 or more XCCDF files as YAML'
+      CMD_XCCDF_FILES_ARG = 'One or more paths to XCCDF files'
       def initialize
-        super(CMD_NAME, takes_commands: false)
-        short_desc(CMD_SHORT)
-        long_desc(CMD_LONG)
-        options.on('-b [TYPE]', '--benchmark-type [TYPE]', 'XCCDF Benchmark type CIS by default') { |b| @data[:type] = b }
-        options.on('-d [DIR]', '--files-output-directory [DIR]', 'Directory to save files data/mappings by default') { |d| @data[:dir] = d }
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
+        argument_desc(XCCDF_FILES: CMD_XCCDF_FILES_ARG)
+        options.on('-b [TYPE]', '--benchmark-type [TYPE]', 'XCCDF Benchmark type CIS by default') do |b|
+          @data[:type] = b
+        end
+        options.on('-d [DIR]', '--files-output-directory [DIR]', 'Directory to save files data/mappings by default') do |d|
+          @data[:dir] = d
+        end
         options.on('-q', '--quiet', 'Show no output in the terminal') { @data[:quiet] = true }
         options.on('-p [PREFIX]', '--parent-key-prefix [PREFIX]', 'A prefix to append to the parent key') do |p|
           @data[:parent_key_prefix] = p
         end
       end
 
-      def execute(xccdf_file)
-        if @data[:quiet] && !@data[:dir]
-          AbideDevUtils::Output.simple("I don\'t know how to quietly output to the console\n¯\\_(ツ)_/¯") 
+      def execute(*xccdf_files)
+        if @data[:quiet] && @data[:dir].nil?
+          AbideDevUtils::Output.simple("I don\'t know how to quietly output to the console\n¯\\_(ツ)_/¯")
           exit 1
         end
-        @data[:console] = true if @data[:dir].nil?
-        @data[:type] = 'cis' if @data[:type].nil?
-        @data[:parent_key_prefix] = '' if @data[:parent_key_prefix].nil?
-        hfile = AbideDevUtils::XCCDF.gen_map(xccdf_file, **@data)
-        mapping_dir = File.dirname(hfile.keys[0]) unless @data[:dir].nil?
-        AbideDevUtils::Output.simple("Creating directory #{mapping_dir}") unless @data[:quiet] || @data[:console] || @data[:dir].nil? || File.directory?(mapping_dir)
-        FileUtils.mkdir_p(mapping_dir) unless @data[:console] || @data[:dir].nil?
-        hfile.each do |key, val|
-          file_path = @data[:dir].nil? ? nil : key
-          AbideDevUtils::Output.yaml(val, console: @data[:console], file: file_path)
+        xccdf_files.each do |xccdf_file|
+          other_kwarg_syms = %i[type dir quiet parent_key_prefix]
+          other_kwargs = @data.reject { |k, _| other_kwarg_syms.include?(k) }
+          hfile = AbideDevUtils::XCCDF.gen_map(
+            File.expand_path(xccdf_file),
+            dir: @data[:dir],
+            type: @data.fetch(:type, 'cis'),
+            parent_key_prefix: @data.fetch(:parent_key_prefix, ''),
+            **other_kwargs
+          )
+          mapping_dir = File.dirname(hfile.keys[0]) unless @data[:dir].nil?
+          unless @data[:quiet] || @data[:dir].nil? || File.directory?(mapping_dir)
+            AbideDevUtils::Output.simple("Creating directory #{mapping_dir}")
+          end
+          FileUtils.mkdir_p(mapping_dir) unless @data[:dir].nil?
+          hfile.each do |key, val|
+            file_path = @data[:dir].nil? ? nil : key
+            AbideDevUtils::Output.yaml(val, console: @data[:dir].nil?, file: file_path)
+          end
         end
       end
     end
 
-    class XccdfToHieraCommand < CmdParse::Command
+    class XccdfToHieraCommand < AbideCommand
       CMD_NAME = 'to-hiera'
       CMD_SHORT = 'Generates control coverage report'
       CMD_LONG = 'Generates report of valid Puppet classes that match with Hiera controls'
       def initialize
-        super(CMD_NAME, takes_commands: false)
-        short_desc(CMD_SHORT)
-        long_desc(CMD_LONG)
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
         options.on('-b [TYPE]', '--benchmark-type [TYPE]', 'XCCDF Benchmark type') { |b| @data[:type] = b }
         options.on('-o [FILE]', '--out-file [FILE]', 'Path to save file') { |f| @data[:file] = f }
         options.on('-p [PREFIX]', '--parent-key-prefix [PREFIX]', 'A prefix to append to the parent key') do |p|

@@ -11,11 +11,11 @@ module AbideDevUtils
   # Contains modules and classes for working with XCCDF files
   module XCCDF
     # Generate map for CEM
-    def self.gen_map(xccdf_file, opts)
+    def self.gen_map(xccdf_file, **opts)
       type = opts.fetch(:type, 'cis')
       case type.downcase
       when 'cis'
-        new_map = Benchmark.new(xccdf_file).gen_map(**opts)
+        Benchmark.new(xccdf_file).gen_map(**opts)
       else
         raise AbideDevUtils::Errors::UnsupportedXCCDFError, "XCCDF type #{type} is unsupported!"
       end
@@ -192,6 +192,8 @@ module AbideDevUtils
     class Benchmark
       include AbideDevUtils::XCCDF::Common
 
+      MAP_INDICES = %w[title hiera_title hiera_title_num number].freeze
+
       attr_reader :xml, :title, :version, :diff_properties
 
       def initialize(path)
@@ -231,13 +233,9 @@ module AbideDevUtils
 
       def gen_map(dir: nil, type: 'CIS', parent_key_prefix: '', **_)
         os, ver = facter_platform
-        if dir
-          mapping_dir = File.expand_path(File.join(dir, type, os, ver))
-        else
-          mapping_dir = ''
-        end
-        parent_key_prefix = parent_key_prefix.nil? ? nil : ''
-        ['title', 'hiera_title', 'hiera_title_num', 'number'].each_with_object({}) do |idx, h|
+        mapping_dir = dir ? File.expand_path(File.join(dir, type, os, ver)) : ''
+        parent_key_prefix = '' if parent_key_prefix.nil?
+        MAP_INDICES.each_with_object({}) do |idx, h|
           map_file_path = "#{mapping_dir}/#{idx}.yaml"
           h[map_file_path] = map_indexed(index: idx, framework: type, key_prefix: parent_key_prefix)
         end
@@ -287,43 +285,13 @@ module AbideDevUtils
       end
 
       def map_indexed(index: 'title', framework: 'cis', key_prefix: '')
-        all_indexes = ['title', 'hiera_title', 'hiera_title_num', 'number']
-
-        objserver = {}
-        objworkstation = {}
-        #mappings = [framework, index]
-        #mappings.unshift(key_prefix) unless key_prefix.empty?
-        #output = { mappings.join('::') => {} }
-        output = {}
-
         c_map = profiles.each_with_object({}) do |profile, obj|
-          controls_hash = profile.controls.each_with_object({}) do |ctrl, hsh|
-            real_index = if index == 'hiera_title_num'
-                          ctrl.hiera_title(number_format: true)
-                        elsif index == 'title'
-                          resolve_control_reference(ctrl).xpath('./xccdf:title').text
-                        else
-                          ctrl.send(index.to_sym)
-                        end
-            controls_array = all_indexes.each_with_object([]) do |idx_sym, ary|
-              next if idx_sym == index
-    
-              item = if idx_sym == 'hiera_title_num'
-                      ctrl.hiera_title(number_format: true)
-                    elsif idx_sym == 'title'
-                      resolve_control_reference(ctrl).xpath('./xccdf:title').text
-                    else
-                      ctrl.send(idx_sym.to_sym)
-                    end
-              ary << "#{item}"
-            end
-            hsh["#{real_index.to_s}"] = controls_array.sort
-          end
-          obj[profile.level.downcase] = {} if obj[profile.level.downcase].nil? || !obj[profile.level.downcase].is_a?(Hash)
-          obj[profile.level.downcase][profile.title.downcase] = controls_hash.sort_by { |k, _| k }.to_h
+          obj[profile.level.downcase] = {} unless obj[profile.level.downcase].is_a?(Hash)
+          obj[profile.level.downcase][profile.title.downcase] = map_controls_hash(profile, index).sort_by { |k, _| k }.to_h
         end
-          
-        mappings = [framework, index]
+
+        c_map['benchmark'] = { 'title' => title, 'version' => version }
+        mappings = [framework, index, key_prefix]
         mappings.unshift(key_prefix) unless key_prefix.empty?
         { mappings.join('::') => c_map }.to_yaml
       end
@@ -355,6 +323,29 @@ module AbideDevUtils
       end
 
       private
+
+      def format_map_control_index(index, control)
+        case index
+        when 'hiera_title_num'
+          control.hiera_title(number_format: true)
+        when 'title'
+          resolve_control_reference(control).xpath('./xccdf:title').text
+        else
+          control.send(index.to_sym)
+        end
+      end
+
+      def map_controls_hash(profile, index)
+        profile.controls.each_with_object({}) do |ctrl, hsh|
+          control_array = MAP_INDICES.each_with_object([]) do |idx_sym, ary|
+            next if idx_sym == index
+
+            item = format_map_control_index(idx_sym, ctrl)
+            ary << item.to_s
+          end
+          hsh[format_map_control_index(index, ctrl)] = control_array.sort
+        end
+      end
 
       def parse(path)
         validate_xccdf(path)
