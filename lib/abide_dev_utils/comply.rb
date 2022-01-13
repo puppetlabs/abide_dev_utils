@@ -135,6 +135,11 @@ module AbideDevUtils
         subject.find_element(**kwargs)
       end
 
+      def find_elements(subject = driver, **kwargs)
+        driver.manage.window.resize_to(1920, 1080)
+        subject.find_elements(**kwargs)
+      end
+
       def wait_on(timeout: @timeout,
                   ignore_nse: false,
                   quit_driver: true,
@@ -231,7 +236,7 @@ module AbideDevUtils
         error_text = wait_on(ignore_nse: true) { find_element(class: 'kc-feedback-text').text }
         return if error_text.nil? || error_text.empty?
 
-        raise ComplyLoginFailedError, error_text
+        raise AbideDevUtils::Comply::ComplyLoginFailedError, error_text
       end
 
       def filter_node_report_links(node_report_links)
@@ -301,6 +306,18 @@ module AbideDevUtils
         nstr
       end
 
+      def wait_on_element_and_increment(subject = driver, **element_id)
+        element = wait_on { find_element(subject, **element_id) }
+        progress.increment
+        element
+      end
+
+      def wait_on_elements_and_increment(subject = driver, **element_id)
+        elements = wait_on { find_elements(subject, **element_id) }
+        progress.increment
+        elements
+      end
+
       def scrape_report
         output.simple 'Building scan reports, this may take a while...'
         all_checks = {}
@@ -315,17 +332,14 @@ module AbideDevUtils
           progress.increment
           driver.switch_to.window driver.window_handles[1]
           driver.get(link_url)
-          wait_on { find_element(class: 'details-scan-info') }
-          progress.increment
-          wait_on { find_element(class: 'details-table') }
-          progress.increment
+          wait_on_element_and_increment(class: 'details-header')
+          wait_on_element_and_increment(class: 'details-scan-info')
+          wait_on_element_and_increment(class: 'details-table')
           report = { 'scan_results' => {} }
-          scan_info_table = find_element(class: 'details-scan-info')
-          scan_info_table_rows = scan_info_table.find_elements(tag_name: 'tr')
-          progress.increment
-          check_table_body = find_element(tag_name: 'tbody')
-          check_table_rows = check_table_body.find_elements(tag_name: 'tr')
-          progress.increment
+          scan_info_table = wait_on_element_and_increment(class: 'details-scan-info')
+          scan_info_table_rows = wait_on_elements_and_increment(scan_info_table, tag_name: 'tr')
+          check_table_body = wait_on_element_and_increment(tag_name: 'tbody')
+          check_table_rows = wait_on_elements_and_increment(check_table_body, tag_name: 'tr')
           scan_info_table_rows.each do |row|
             key = find_element(row, tag_name: 'h5').text
             value = find_element(row, tag_name: 'strong').text

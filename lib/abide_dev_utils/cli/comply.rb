@@ -71,6 +71,9 @@ module Abide
         options.on('--ignore [X,Y,Z]', Array, OPT_IGNORE_NODES) do |i|
           @data[:ignorelist] = i
         end
+        options.on('--page-source-on-error', 'Dump page source to file on error') do
+          @data[:page_source_on_error] = true
+        end
       end
 
       def help_arguments
