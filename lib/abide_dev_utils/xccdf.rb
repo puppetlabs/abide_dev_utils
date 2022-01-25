@@ -291,7 +291,7 @@ module AbideDevUtils
         end
 
         c_map['benchmark'] = { 'title' => title, 'version' => version }
-        mappings = [framework, index, key_prefix]
+        mappings = [framework, index]
         mappings.unshift(key_prefix) unless key_prefix.empty?
         { mappings.join('::') => c_map }.to_yaml
       end
