@@ -35,7 +35,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'nokogiri', '~> 1.11'
   spec.add_dependency 'cmdparse', '~> 3.0'
   spec.add_dependency 'puppet', '>= 6.23'
-  spec.add_dependency 'jira-ruby', '~> 2.1'
+  spec.add_dependency 'jira-ruby', '~> 2.2'
   spec.add_dependency 'ruby-progressbar', '~> 1.11'
   spec.add_dependency 'selenium-webdriver', '~> 4.0.0.beta4'
   spec.add_dependency 'google-cloud-storage', '~> 1.34'
