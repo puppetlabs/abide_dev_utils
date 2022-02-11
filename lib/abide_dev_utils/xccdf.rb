@@ -298,7 +298,16 @@ module AbideDevUtils
 
       def facter_platform
         cpe = xpath('xccdf:Benchmark/xccdf:platform')[0]['idref'].split(':')
-        [cpe[4].split('_')[0], cpe[5].split('.')[0]]
+        if cpe.length > 4
+          product_name = cpe[4].split('_')
+          product_version = cpe[5].split('.') unless cpe[5].nil?
+          return [product_name[0], product_version[0]] unless product_version[0] == '-'
+
+          return [product_name[0], product_name[-1]] if product_version[0] == '-'
+        end
+
+        product = cpe[3].split('_')
+        [product[0], product[-1]] # This should wrap the name i.e 'Windows' and the version '10'
       end
 
       # Converts object to Hiera-formatted YAML
