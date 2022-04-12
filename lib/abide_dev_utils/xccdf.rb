@@ -34,21 +34,10 @@ module AbideDevUtils
 
     # Diffs two xccdf files
     def self.diff(file1, file2, opts)
+      require 'abide_dev_utils/xccdf/diff'
       bm1 = Benchmark.new(file1)
       bm2 = Benchmark.new(file2)
-      profile = opts.fetch(:profile, nil)
-      profile_diff = if profile.nil?
-                       bm1.diff_profiles(bm2).each do |_, v|
-                         v.transform_values! { |x| x.map!(&:to_s) }
-                       end
-                     else
-                       bm1.diff_profiles(bm2)[profile].transform_values! { |x| x.map!(&:to_s) }
-                     end
-      profile_key = profile.nil? ? 'all_profiles' : profile
-      {
-        'benchmark' => bm1.diff_title_version(bm2),
-        profile_key => profile_diff
-      }
+      AbideDevUtils::XCCDF::Diff.diff_benchmarks(bm1, bm2, opts)
     end
 
     # Common constants and methods included by nearly everything else
