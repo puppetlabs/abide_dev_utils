@@ -104,6 +104,7 @@ module Abide
         options.on('-p [PROFILE]', '--profile', 'Only diff and specific profile in the benchmarks') do |x|
           @data[:profile] = x
         end
+        options.on('-r', '--raw', 'Output the diff in raw hash format') { @data[:raw] = true }
         options.on('-q', '--quiet', 'Show no output in the terminal') { @data[:quiet] = false }
         options.on('--no-diff-profiles', 'Do not diff the profiles in the XCCDF files') { @data[:diff_profiles] = false }
         options.on('--no-diff-controls', 'Do not diff the controls in the XCCDF files') { @data[:diff_controls] = false }

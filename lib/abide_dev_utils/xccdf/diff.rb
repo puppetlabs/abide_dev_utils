@@ -6,6 +6,15 @@ module AbideDevUtils
   module XCCDF
     # Contains methods and classes used to diff XCCDF-derived objects.
     module Diff
+      DEFAULT_DIFF_OPTS = {
+        similarity: 1,
+        strict: true,
+        strip: true,
+        array_path: true,
+        delimiter: '//',
+        use_lcs: true,
+      }.freeze
+
       # Represents a change in a diff.
       class ChangeSet
         attr_reader :change, :key, :value, :value_to
@@ -19,8 +28,16 @@ module AbideDevUtils
         end
 
         def to_s
-          val_to_str = value_to.nil? ? ' ' : " to #{value_to} "
-          "#{change_string} value #{value}#{val_to_str}at #{key}"
+          value_change_string(value, value_to)
+        end
+
+        def to_h
+          {
+            change: change,
+            key: key,
+            value: value,
+            value_to: value_to,
+          }
         end
 
         def can_merge?(other)
@@ -62,33 +79,48 @@ module AbideDevUtils
           equality
         end
 
-        def validate_change(change)
-          raise ArgumentError, "Change type #{change} in invalid" unless ['+', '-', '~'].include?(change)
+        def validate_change(chng)
+          raise ArgumentError, "Change type #{chng} in invalid" unless ['+', '-', '~'].include?(chng)
         end
 
-        def change_string
-          case change
+        def change_string(chng)
+          case chng
           when '-'
-            'remove'
+            'Remove'
           when '+'
-            'add'
+            'Add'
           else
-            'change'
+            'Change'
           end
+        end
+
+        def value_change_string(value, value_to)
+          change_str = []
+          change_diff = Hashdiff.diff(value, value_to || {}, AbideDevUtils::XCCDF::Diff::DEFAULT_DIFF_OPTS)
+          return if change_diff.empty?
+          return value_change_string_single_type(change_diff, value) if all_single_change_type?(change_diff)
+
+          change_diff.each do |chng|
+            change_str << if chng.length == 4
+                            "#{change_string(chng[0])} #{chng[1][0]} \"#{chng[2]}\" to \"#{chng[3]}\""
+                          else
+                            "#{change_string(chng[0])} #{chng[1][0]} with value #{chng[2]}"
+                          end
+          end
+          change_str.join(', ')
+        end
+
+        def value_change_string_single_type(change_diff, value)
+          "#{change_string(change_diff[0][0])} #{value[:number]} - #{value[:level]} - #{value[:title]}"
+        end
+
+        def all_single_change_type?(change_diff)
+          change_diff.length > 1 && change_diff.map { |x| x[0] }.uniq.length == 1
         end
       end
 
       # Class used to diff two Benchmark profiles.
       class ProfileDiff
-        DEFAULT_DIFF_OPTS = {
-          similarity: 1,
-          strict: true,
-          strip: true,
-          array_path: true,
-          delimiter: '//',
-          use_lcs: false
-        }.freeze
-
         def initialize(profile_a, profile_b, opts = {})
           @profile_a = profile_a
           @profile_b = profile_b
@@ -102,26 +134,35 @@ module AbideDevUtils
         private
 
         def new_diff
-          Hashdiff.diff(profile_a, profile_b, DEFAULT_DIFF_OPTS).each_with_object({}) do |change, diff|
+          Hashdiff.diff(@profile_a, @profile_b, AbideDevUtils::XCCDF::Diff::DEFAULT_DIFF_OPTS).each_with_object({}) do |change, diff|
             val_to = change.length == 4 ? change[3] : nil
             change_key = change[2].is_a?(Hash) ? change[2][:title] : change[2]
-            diff[change_key] = [] unless diff.key?(change_key)
-            diff[change_key] << ChangeSet.new(change: change[0], key: change[1], value: change[2], value_to: val_to)
+            if diff.key?(change_key)
+              diff[change_key] = merge_changes(
+                [
+                  diff[change_key][0],
+                  ChangeSet.new(change: change[0], key: change[1], value: change[2], value_to: val_to),
+                ]
+              )
+            else
+              diff[change_key] = [ChangeSet.new(change: change[0], key: change[1], value: change[2], value_to: val_to)]
+            end
+          end
+        end
+
+        def merge_changes(changes)
+          return changes if changes.length < 2
+
+          if changes[0].can_merge?(changes[1])
+            [changes[0].merge(changes[1])]
+          else
+            changes
           end
         end
       end
 
       # Class used to diff two AbideDevUtils::XCCDF::Benchmark objects.
       class BenchmarkDiff
-        DEFAULT_DIFF_OPTS = {
-          similarity: 1,
-          strict: true,
-          strip: true,
-          array_path: true,
-          delimiter: '//',
-          use_lcs: false
-        }.freeze
-
         def initialize(benchmark_a, benchmark_b, opts = {})
           @benchmark_a = benchmark_a
           @benchmark_b = benchmark_b
@@ -136,18 +177,24 @@ module AbideDevUtils
           @title_version ||= diff_title_version
         end
 
-        def profiles
-          @profiles ||= diff_profiles
+        def profiles(profile: nil)
+          @profiles ||= diff_profiles(profile: profile)
         end
 
         private
 
         def diff_title_version
-          Hashdiff.diff(
+          diff = Hashdiff.diff(
             @benchmark_a.to_h.reject { |k, _| k.to_s == 'profiles' },
             @benchmark_b.to_h.reject { |k, _| k.to_s == 'profiles' },
-            DEFAULT_DIFF_OPTS
+            AbideDevUtils::XCCDF::Diff::DEFAULT_DIFF_OPTS
           )
+          diff.each_with_object({}) do |change, tdiff|
+            val_to = change.length == 4 ? change[3] : nil
+            change_key = change[2].is_a?(Hash) ? change[2][:title] : change[2]
+            tdiff[change_key] = [] unless tdiff.key?(change_key)
+            tdiff[change_key] << ChangeSet.new(change: change[0], key: change[1], value: change[2], value_to: val_to)
+          end
         end
 
         def diff_profiles(profile: nil)
@@ -166,16 +213,19 @@ module AbideDevUtils
         profile = opts.fetch(:profile, nil)
         profile_key = profile.nil? ? 'all_profiles' : profile
         benchmark_diff = BenchmarkDiff.new(benchmark_a, benchmark_b, opts)
+        transform_method_sym = opts.fetch(:raw, false) ? :to_h : :to_s
         diff = if profile.nil?
-                 benchmark_diff.diff_profiles.each do |_, v|
-                   v.transform_values! { |x| x.map!(&:to_s) }
+                 benchmark_diff.profiles.each do |_, v|
+                   v.transform_values! { |x| x.map!(&transform_method_sym) }
                  end
                else
-                 benchmark_diff.diff_profiles(profile: profile)[profile].transform_values! { |x| x.map!(&:to_s) }
+                 benchmark_diff.profiles(profile: profile)[profile].transform_values! { |x| x.map!(&transform_method_sym) }
                end
+        return diff.values.flatten if opts.fetch(:raw, false)
+
         {
-          'benchmark' => benchmark_diff.diff_title_version,
-          profile_key => diff,
+          'benchmark' => benchmark_diff.title_version.transform_values { |x| x.map!(&:to_s) },
+          profile_key => diff.values.flatten,
         }
       end
     end

@@ -153,25 +153,6 @@ module AbideDevUtils
         diff_properties.map { |x| send(x) } == other.diff_properties.map { |x| other.send(x) }
       end
 
-      def default_diff_opts
-        {
-          similarity: 1,
-          strict: true,
-          strip: true,
-          array_path: true,
-          delimiter: '//',
-          use_lcs: false
-        }
-      end
-
-      def diff(other, **opts)
-        Hashdiff.diff(
-          to_h,
-          other.to_h,
-          default_diff_opts.merge(opts)
-        )
-      end
-
       def abide_object?
         true
       end
@@ -244,33 +225,6 @@ module AbideDevUtils
           version: version,
           profiles: profiles.to_h
         }
-      end
-
-      def diff_title_version(other)
-        Hashdiff.diff(
-          to_h.reject { |k, _| k.to_s == 'profiles' },
-          other.to_h.reject { |k, _| k.to_s == 'profiles' },
-          default_diff_opts
-        )
-      end
-
-      def diff_profiles(other)
-        this_diff = {}
-        other_hash = other.to_h[:profiles]
-        to_h[:profiles].each do |name, data|
-          diff_h = Hashdiff.diff(data, other_hash[name], default_diff_opts).each_with_object({}) do |x, a|
-            val_to = x.length == 4 ? x[3] : nil
-            a_key = x[2].is_a?(Hash) ? x[2][:title] : x[2]
-            a[a_key] = [] unless a.key?(a_key)
-            a[a_key] << ChangeSet.new(change: x[0], key: x[1], value: x[2], value_to: val_to)
-          end
-          this_diff[name] = diff_h
-        end
-        this_diff
-      end
-
-      def diff_controls(other)
-        controls.diff(other.controls)
       end
 
       def map_indexed(index: 'title', framework: 'cis', key_prefix: '')
