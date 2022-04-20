@@ -1,7 +1,41 @@
 # frozen_string_literal: true
 
+require 'abide_dev_utils/validate'
+
 module AbideDevUtils
   module Files
+    class Reader
+      def self.read(path, raw: false, safe: true, opts: {})
+        AbideDevUtils::Validate.file(path)
+        return File.read(path) if raw
+
+        extension = File.extname(path)
+        case extension
+        when /\.yaml|\.yml/
+          require 'yaml'
+          if safe
+            YAML.safe_load(File.read(path))
+          else
+            YAML.load_file(path)
+          end
+        when '.json'
+          require 'json'
+          return JSON.parse(File.read(path), opts) if safe
+
+          JSON.parse!(File.read(path), opts)
+        when '.xml'
+          require 'nokogiri'
+          File.open(path, 'r') do |file|
+            Nokogiri::XML.parse(file) do |config|
+              config.strict.noblanks.norecover
+            end
+          end
+        else
+          File.read(path)
+        end
+      end
+    end
+
     class Writer
       MSG_EXT_APPEND = 'Appending %s extension to file'
 

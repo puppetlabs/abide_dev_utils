@@ -104,14 +104,24 @@ module Abide
         options.on('-p [PROFILE]', '--profile', 'Only diff and specific profile in the benchmarks') do |x|
           @data[:profile] = x
         end
+        options.on('-l [LEVEL]', '--level', 'Only diff the specific level in the benchmarks') do |x|
+          @data[:level] = x
+        end
         options.on('-r', '--raw', 'Output the diff in raw hash format') { @data[:raw] = true }
         options.on('-q', '--quiet', 'Show no output in the terminal') { @data[:quiet] = false }
         options.on('--no-diff-profiles', 'Do not diff the profiles in the XCCDF files') { @data[:diff_profiles] = false }
         options.on('--no-diff-controls', 'Do not diff the controls in the XCCDF files') { @data[:diff_controls] = false }
+        options.on('--old-style', 'Use old-style diffs') { @data[:old_style] = true }
       end
 
       def execute(file1, file2)
-        diffreport = AbideDevUtils::XCCDF.diff(file1, file2, @data)
+        diffreport = if @data[:old_style]
+                       AbideDevUtils::XCCDF.diff(file1, file2, @data)
+                     else
+                       dr = AbideDevUtils::XCCDF.new_style_diff(file1, file2, @data)
+                       dr[:diff][:number_title].map! { |d| d[:text] }
+                       dr
+                     end
         AbideDevUtils::Output.yaml(diffreport, console: @data.fetch(:quiet, true), file: @data.fetch(:outfile, nil))
       end
     end

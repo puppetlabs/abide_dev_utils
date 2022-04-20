@@ -2,6 +2,7 @@
 
 require 'cmdparse'
 require 'abide_dev_utils/version'
+require 'abide_dev_utils/cli/cem'
 require 'abide_dev_utils/constants'
 require 'abide_dev_utils/cli/comply'
 require 'abide_dev_utils/cli/puppet'
@@ -22,6 +23,7 @@ module Abide
       parser.main_options.banner = ROOT_CMD_BANNER
       parser.add_command(CmdParse::HelpCommand.new, default: true)
       parser.add_command(CmdParse::VersionCommand.new(add_switches: true))
+      parser.add_command(CemCommand.new)
       parser.add_command(ComplyCommand.new)
       parser.add_command(PuppetCommand.new)
       parser.add_command(XccdfCommand.new)

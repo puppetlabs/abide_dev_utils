@@ -2,7 +2,24 @@
 
 require "abide_dev_utils"
 
+module TestResources
+  def resources_dir
+    File.expand_path(File.join(__dir__, "resources"))
+  end
+
+  def all_test_files
+    Dir.glob(File.join(resources_dir, "test_files", "*"))
+  end
+
+  def test_xccdf_files
+    all_test_files.select { |f| f.end_with?("-xccdf.xml") }
+  end
+end
+
 RSpec.configure do |config|
+  config.include TestResources
+  config.extend TestResources
+
   # Enable flags like --only-failures and --next-failure
   config.example_status_persistence_file_path = ".rspec_status"
 
