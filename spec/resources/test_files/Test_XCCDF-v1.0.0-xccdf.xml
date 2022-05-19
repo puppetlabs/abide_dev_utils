@@ -1,0 +1,460 @@
+<xccdf:Benchmark xmlns:xccdf="http://checklists.nist.gov/xccdf/1.2" xmlns="http://checklists.nist.gov/xccdf/1.2" xmlns:ae="http://benchmarks.cisecurity.org/ae/0.5" xmlns:cc6="http://cisecurity.org/20-cc/v6.1" xmlns:cc7="http://cisecurity.org/20-cc/v7.0" xmlns:cc8="http://cisecurity.org/20-cc/v8.0" xmlns:ciscf="https://benchmarks.cisecurity.org/ciscf/1.0" xmlns:notes="http://benchmarks.cisecurity.org/notes" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="xccdf_org.testdata.benchmarks_benchmark_1.0.0_Test_XCCDF" style="SCAP_1.2" xsi:schemaLocation="http://checklists.nist.gov/xccdf/1.2 https://scap.nist.gov/schema/xccdf/1.2/xccdf_1.2.xsd">
+  <xccdf:status date="2022-01-01">accepted</xccdf:status>
+  <xccdf:title xml:lang="en">Test XCCDF</xccdf:title>
+  <xccdf:description xml:lang="en">
+    <xhtml:p>
+This document is a test XCCDF file with embedded xhtml here:       <xhtml:a href="mailto:fake@fakeaf.org">fake@fakeaf.org</xhtml:a>
+.    </xhtml:p>
+  </xccdf:description>
+  <xccdf:notice id="terms-of-use" xml:lang="en">This is the Terms of Use</xccdf:notice>
+  <xccdf:platform idref="cpe:/o:fake:fake_2022"/>
+  <xccdf:version>1.0.0</xccdf:version>
+  <xccdf:Profile id="xccdf_org.testdata.benchmarks_profile_Level_1_Profile_1">
+    <xccdf:title xml:lang="en">Level 1 (L1) - Profile 1</xccdf:title>
+    <xccdf:description xml:lang="en">
+      <xhtml:p>Items in this profile intend to:</xhtml:p>
+      <xhtml:ul>
+        <xhtml:li>be the starting baseline for most organizations;</xhtml:li>
+        <xhtml:li>be practical and prudent;</xhtml:li>
+        <xhtml:li>provide a clear security benefit; and</xhtml:li>
+        <xhtml:li>not inhibit the utility of the technology beyond acceptable means.</xhtml:li>
+      </xhtml:ul>
+    </xccdf:description>
+    <xccdf:select idref="xccdf_org.testdata.benchmarks_rule_1.1.1_L1_Rule_1" selected="true"/>
+    <xccdf:select idref="xccdf_org.testdata.benchmarks_rule_1.1.2_L1_Rule_2" selected="true"/>
+    <xccdf:select idref="xccdf_org.testdata.benchmarks_rule_1.1.3_L1_Rule_3" selected="true"/>
+  </xccdf:Profile>
+  <xccdf:Profile id="xccdf_org.testdata.benchmarks_profile_Level_2_Profile_2">
+    <xccdf:title xml:lang="en">Level 2 (L2) - Profile 2</xccdf:title>
+    <xccdf:description xml:lang="en">
+      <xhtml:p>This profile extends the "Level 1 (L1)" profile. Items in this profile exhibit one or more of the following characteristics:</xhtml:p>
+      <xhtml:ul>
+        <xhtml:li>are intended for environments or use cases where security is more critical than manageability and usability;</xhtml:li>
+        <xhtml:li>may negatively inhibit the utility or performance of the technology; and</xhtml:li>
+        <xhtml:li>limit the ability of remote management/access.</xhtml:li>
+      </xhtml:ul>
+      <xhtml:p>
+        <xhtml:strong>Note:</xhtml:strong>
+ Implementation of Level 2 requires that         <xhtml:strong>both</xhtml:strong>
+ Level 1 and Level 2 settings are applied.      </xhtml:p>
+    </xccdf:description>
+    <xccdf:select idref="xccdf_org.testdata.benchmarks_rule_1.1.1_L1_Rule_1" selected="true"/>
+    <xccdf:select idref="xccdf_org.testdata.benchmarks_rule_1.2.1_L1_Rule_2" selected="true"/>
+    <xccdf:select idref="xccdf_org.testdata.benchmarks_rule_2.1.1_L1_Rule_3" selected="true"/>
+    <xccdf:select idref="xccdf_org.testdata.benchmarks_rule_1.1.2_L2_Rule_4" selected="true"/>
+    <xccdf:select idref="xccdf_org.testdata.benchmarks_rule_1.2.2_L2_Rule_5" selected="true"/>
+    <xccdf:select idref="xccdf_org.testdata.benchmarks_rule_2.1.2_L2_Rule_6" selected="true"/>
+  </xccdf:Profile>
+  <Value id="xccdf_org.testdata.benchmarks_value_1_var" operator="greater than or equal" type="number">
+    <title>(L1) Rule 1</title>
+    <description>This value is used in Rule: (L1) Rule 1</description>
+    <value>24</value>
+  </Value>
+  <Value id="xccdf_org.testdata.benchmarks_value_2_var" operator="equals" type="string">
+    <title>(L1) Rule 2</title>
+    <description>This value is used in Rule: (L1) Rule 2</description>
+    <value>reg_dword</value>
+  </Value>
+  <Value id="xccdf_org.testdata.benchmarks_value_3_var" operator="equals" type="boolean">
+    <title>(L1) Rule 3</title>
+    <description>This value is used in Rule: (L1) Rule 3</description>
+    <value>1</value>
+  </Value>
+  <Value id="xccdf_org.testdata.benchmarks_value_4_var" operator="less than or equal" type="number">
+    <title>(L2) Rule 4</title>
+    <description>This value is used in Rule: (L2) Rule 4</description>
+    <value>24</value>
+  </Value>
+  <Value id="xccdf_org.testdata.benchmarks_value_5_var" operator="equals" type="string">
+    <title>(L2) Rule 5</title>
+    <description>This value is used in Rule: (L2) Rule 5</description>
+    <value>reg_sz</value>
+  </Value>
+  <Value id="xccdf_org.testdata.benchmarks_value_6_var" operator="equals" type="boolean">
+    <title>(L2) Rule 6</title>
+    <description>This value is used in Rule: (L2) Rule 6</description>
+    <value>0</value>
+  </Value>
+  <xccdf:Group id="xccdf_org.testdata.benchmarks_group_1_Group_1">
+    <xccdf:title xml:lang="en">Group 1</xccdf:title>
+    <xccdf:description xml:lang="en">
+      <xhtml:p>This section is Group 1</xhtml:p>
+    </xccdf:description>
+    <xccdf:Group id="xccdf_org.testdata.benchmarks_group_1.1_Group_1_1">
+      <xccdf:title xml:lang="en">Group 1.1</xccdf:title>
+      <xccdf:description xml:lang="en">
+        <xhtml:p>This section is Group 1.1.</xhtml:p>
+      </xccdf:description>
+      <xccdf:Rule id="xccdf_org.testdata.benchmarks_rule_1.1.1_L1_Rule_1" role="full" selected="false" weight="1.0">
+        <xccdf:title xml:lang="en">(L1) Rule 1</xccdf:title>
+        <xccdf:description xml:lang="en">
+          <xhtml:p>This policy setting determines the number of things</xhtml:p>
+          <xhtml:p>
+The recommended state for this setting is:             <xhtml:span class="inline_block">24</xhtml:span>
+.          </xhtml:p>
+        </xccdf:description>
+        <xccdf:metadata>
+          <controls:cis_controls xmlns:controls="http://cisecurity.org/controls">
+            <controls:framework urn="urn:cisecurity.org:controls:8.0">
+              <controls:safeguard title="Centralize Account Management" urn="urn:cisecurity.org:controls:8.0:5:6">
+                <controls:implementation_groups ig2="true" ig3="true"/>
+                <controls:asset_type>Users</controls:asset_type>
+                <controls:security_function>Protect</controls:security_function>
+              </controls:safeguard>
+            </controls:framework>
+            <controls:framework urn="urn:cisecurity.org:controls:7.0">
+              <controls:safeguard title="Configure Centralized Point of Authentication" urn="urn:cisecurity.org:controls:7.0:16:2">
+                <controls:implementation_groups ig2="true" ig3="true"/>
+                <controls:asset_type>Users</controls:asset_type>
+                <controls:security_function>Protect</controls:security_function>
+              </controls:safeguard>
+            </controls:framework>
+          </controls:cis_controls>
+        </xccdf:metadata>
+        <xccdf:rationale xml:lang="en">
+          <xhtml:p>This should be implemented because of reasons.</xhtml:p>
+        </xccdf:rationale>
+        <xccdf:ident cc7:controlURI="http://cisecurity.org/20-cc/v7.0/control/16/subcontrol/2" system="http://cisecurity.org/20-cc/v7.0"/>
+        <xccdf:ident cc8:controlURI="http://cisecurity.org/20-cc/v8.0/control/5/subcontrol/6" system="http://cisecurity.org/20-cc/v8.0"/>
+        <xccdf:fixtext xml:lang="en">
+          <xhtml:div>
+            <xhtml:p>
+              <xhtml:p>
+To establish the recommended configuration via GP, set the following UI path to                 <xhtml:span class="inline_block">24</xhtml:span>
+:              </xhtml:p>
+              <xhtml:code class="code_block">Computer Configuration\Policies\Windows Settings\Rule 1 Settings</xhtml:code>
+              <xhtml:p class="bold">Impact:</xhtml:p>
+              <xhtml:p>
+                <xhtml:p>The major impact of this configuration is that bad things will happen without it set.</xhtml:p>
+              </xhtml:p>
+            </xhtml:p>
+          </xhtml:div>
+        </xccdf:fixtext>
+        <xccdf:complex-check operator="AND">
+          <check system="http://oval.mitre.org/XMLSchema/oval-definitions-5">
+            <check-export export-name="oval:org.testdata.benchmarks.test_xccdf:var:1" value-id="xccdf_org.testdata.benchmarks_value_1_var"/>
+            <check-content-ref href="Test_XCCDF_v1.0.0-oval.xml" name="oval:org.testdata.benchmarks.test_xccdf:def:1"/>
+          </check>
+        </xccdf:complex-check>
+      </xccdf:Rule>
+      <xccdf:Rule id="xccdf_org.testdata.benchmarks_rule_1.1.2_L2_Rule_4" role="full" selected="false" weight="1.0">
+        <xccdf:title xml:lang="en">(L2) Rule 4</xccdf:title>
+        <xccdf:description xml:lang="en">
+          <xhtml:p>Now you should pump this shit like they do in the future.</xhtml:p>
+          <xhtml:p>
+The recommended state for this setting is             <xhtml:span class="inline_block">24 or fewer</xhtml:span>
+.          </xhtml:p>
+        </xccdf:description>
+        <xccdf:metadata>
+          <controls:cis_controls xmlns:controls="http://cisecurity.org/controls">
+            <controls:framework urn="urn:cisecurity.org:controls:8.0">
+              <controls:safeguard title="Disable Dormant Accounts" urn="urn:cisecurity.org:controls:8.0:5:3">
+                <controls:implementation_groups ig1="true" ig2="true" ig3="true"/>
+                <controls:asset_type>Users</controls:asset_type>
+                <controls:security_function>Respond</controls:security_function>
+              </controls:safeguard>
+            </controls:framework>
+            <controls:framework urn="urn:cisecurity.org:controls:7.0">
+              <controls:safeguard title="Ensure All Accounts Have An Expiration Date" urn="urn:cisecurity.org:controls:7.0:16:10">
+                <controls:implementation_groups ig2="true" ig3="true"/>
+                <controls:asset_type>Users</controls:asset_type>
+                <controls:security_function>Protect</controls:security_function>
+              </controls:safeguard>
+            </controls:framework>
+          </controls:cis_controls>
+        </xccdf:metadata>
+        <xccdf:rationale xml:lang="en">
+          <xhtml:p>Now you should pump this shit like they do in the future.</xhtml:p>
+        </xccdf:rationale>
+        <xccdf:ident cc7:controlURI="http://cisecurity.org/20-cc/v7.0/control/16/subcontrol/10" system="http://cisecurity.org/20-cc/v7.0"/>
+        <xccdf:ident cc8:controlURI="http://cisecurity.org/20-cc/v8.0/control/5/subcontrol/3" system="http://cisecurity.org/20-cc/v8.0"/>
+        <xccdf:fixtext xml:lang="en">
+          <xhtml:div>
+            <xhtml:p>
+              <xhtml:p>
+To establish the recommended configuration via GP, set the following UI path to                 <xhtml:span class="inline_block">24 or fewer</xhtml:span>
+:              </xhtml:p>
+              <xhtml:code class="code_block">Computer Configuration\Policies\Windows Settings\Rule 4 Settings</xhtml:code>
+              <xhtml:p class="bold">Impact:</xhtml:p>
+              <xhtml:p>
+                <xhtml:p>If you don't, bad things will happen.</xhtml:p>
+              </xhtml:p>
+            </xhtml:p>
+          </xhtml:div>
+        </xccdf:fixtext>
+        <xccdf:complex-check operator="AND">
+          <check system="http://oval.mitre.org/XMLSchema/oval-definitions-5">
+            <check-export export-name="oval:org.testdata.benchmarks.test_xccdf:var:4" value-id="xccdf_org.testdata.benchmarks_value_4_var"/>
+            <check-content-ref href="Test_XCCDF_v1.0.0-oval.xml" name="oval:org.testdata.benchmarks.test_xccdf:def:4"/>
+          </check>
+        </xccdf:complex-check>
+      </xccdf:Rule>
+    </xccdf:Group>
+    <xccdf:Group id="xccdf_org.cisecurity.benchmarks_group_1.2_Group_1_2">
+      <xccdf:title xml:lang="en">Group 1.2</xccdf:title>
+      <xccdf:description xml:lang="en">
+        <xhtml:p>This is Group 1.2</xhtml:p>
+      </xccdf:description>
+      <xccdf:Rule id="xccdf_org.testdata.benchmarks_rule_1.2.1_L1_Rule_2" role="full" selected="false" weight="1.0">
+        <xccdf:title xml:lang="en">(L1) Rule 2</xccdf:title>
+        <xccdf:description xml:lang="en">
+          <xhtml:p>This policy setting determines the number of things</xhtml:p>
+          <xhtml:p>
+The recommended state for this setting is:             <xhtml:span class="inline_block">24</xhtml:span>
+.          </xhtml:p>
+        </xccdf:description>
+        <xccdf:metadata>
+          <controls:cis_controls xmlns:controls="http://cisecurity.org/controls">
+            <controls:framework urn="urn:cisecurity.org:controls:8.0">
+              <controls:safeguard title="Centralize Account Management" urn="urn:cisecurity.org:controls:8.0:5:6">
+                <controls:implementation_groups ig2="true" ig3="true"/>
+                <controls:asset_type>Users</controls:asset_type>
+                <controls:security_function>Protect</controls:security_function>
+              </controls:safeguard>
+            </controls:framework>
+            <controls:framework urn="urn:cisecurity.org:controls:7.0">
+              <controls:safeguard title="Configure Centralized Point of Authentication" urn="urn:cisecurity.org:controls:7.0:16:2">
+                <controls:implementation_groups ig2="true" ig3="true"/>
+                <controls:asset_type>Users</controls:asset_type>
+                <controls:security_function>Protect</controls:security_function>
+              </controls:safeguard>
+            </controls:framework>
+          </controls:cis_controls>
+        </xccdf:metadata>
+        <xccdf:rationale xml:lang="en">
+          <xhtml:p>This should be implemented because of reasons.</xhtml:p>
+        </xccdf:rationale>
+        <xccdf:ident cc7:controlURI="http://cisecurity.org/20-cc/v7.0/control/16/subcontrol/2" system="http://cisecurity.org/20-cc/v7.0"/>
+        <xccdf:ident cc8:controlURI="http://cisecurity.org/20-cc/v8.0/control/5/subcontrol/6" system="http://cisecurity.org/20-cc/v8.0"/>
+        <xccdf:fixtext xml:lang="en">
+          <xhtml:div>
+            <xhtml:p>
+              <xhtml:p>
+To establish the recommended configuration via GP, set the following UI path to                 <xhtml:span class="inline_block">24</xhtml:span>
+:              </xhtml:p>
+              <xhtml:code class="code_block">Computer Configuration\Policies\Windows Settings\Rule 1 Settings</xhtml:code>
+              <xhtml:p class="bold">Impact:</xhtml:p>
+              <xhtml:p>
+                <xhtml:p>The major impact of this configuration is that bad things will happen without it set.</xhtml:p>
+              </xhtml:p>
+            </xhtml:p>
+          </xhtml:div>
+        </xccdf:fixtext>
+        <xccdf:complex-check operator="AND">
+          <check system="http://oval.mitre.org/XMLSchema/oval-definitions-5">
+            <check-export export-name="oval:org.testdata.benchmarks.test_xccdf:var:2" value-id="xccdf_org.testdata.benchmarks_value_2_var"/>
+            <check-content-ref href="Test_XCCDF_v1.0.0-oval.xml" name="oval:org.testdata.benchmarks.test_xccdf:def:2"/>
+          </check>
+        </xccdf:complex-check>
+      </xccdf:Rule>
+      <xccdf:Rule id="xccdf_org.testdata.benchmarks_rule_1.2.2_L2_Rule_5" role="full" selected="false" weight="1.0">
+        <xccdf:title xml:lang="en">(L2) Rule 5</xccdf:title>
+        <xccdf:description xml:lang="en">
+          <xhtml:p>Now you should pump this shit like they do in the future.</xhtml:p>
+          <xhtml:p>
+The recommended state for this setting is             <xhtml:span class="inline_block">24 or fewer</xhtml:span>
+.          </xhtml:p>
+        </xccdf:description>
+        <xccdf:metadata>
+          <controls:cis_controls xmlns:controls="http://cisecurity.org/controls">
+            <controls:framework urn="urn:cisecurity.org:controls:8.0">
+              <controls:safeguard title="Disable Dormant Accounts" urn="urn:cisecurity.org:controls:8.0:5:3">
+                <controls:implementation_groups ig1="true" ig2="true" ig3="true"/>
+                <controls:asset_type>Users</controls:asset_type>
+                <controls:security_function>Respond</controls:security_function>
+              </controls:safeguard>
+            </controls:framework>
+            <controls:framework urn="urn:cisecurity.org:controls:7.0">
+              <controls:safeguard title="Ensure All Accounts Have An Expiration Date" urn="urn:cisecurity.org:controls:7.0:16:10">
+                <controls:implementation_groups ig2="true" ig3="true"/>
+                <controls:asset_type>Users</controls:asset_type>
+                <controls:security_function>Protect</controls:security_function>
+              </controls:safeguard>
+            </controls:framework>
+          </controls:cis_controls>
+        </xccdf:metadata>
+        <xccdf:rationale xml:lang="en">
+          <xhtml:p>Now you should pump this shit like they do in the future.</xhtml:p>
+        </xccdf:rationale>
+        <xccdf:ident cc7:controlURI="http://cisecurity.org/20-cc/v7.0/control/16/subcontrol/10" system="http://cisecurity.org/20-cc/v7.0"/>
+        <xccdf:ident cc8:controlURI="http://cisecurity.org/20-cc/v8.0/control/5/subcontrol/3" system="http://cisecurity.org/20-cc/v8.0"/>
+        <xccdf:fixtext xml:lang="en">
+          <xhtml:div>
+            <xhtml:p>
+              <xhtml:p>
+To establish the recommended configuration via GP, set the following UI path to                 <xhtml:span class="inline_block">24 or fewer</xhtml:span>
+:              </xhtml:p>
+              <xhtml:code class="code_block">Computer Configuration\Policies\Windows Settings\Rule 4 Settings</xhtml:code>
+              <xhtml:p class="bold">Impact:</xhtml:p>
+              <xhtml:p>
+                <xhtml:p>If you don't, bad things will happen.</xhtml:p>
+              </xhtml:p>
+            </xhtml:p>
+          </xhtml:div>
+        </xccdf:fixtext>
+        <xccdf:complex-check operator="AND">
+          <check system="http://oval.mitre.org/XMLSchema/oval-definitions-5">
+            <check-export export-name="oval:org.testdata.benchmarks.test_xccdf:var:5" value-id="xccdf_org.testdata.benchmarks_value_5_var"/>
+            <check-content-ref href="Test_XCCDF_v1.0.0-oval.xml" name="oval:org.testdata.benchmarks.test_xccdf:def:5"/>
+          </check>
+        </xccdf:complex-check>
+      </xccdf:Rule>
+    </xccdf:Group>
+  </xccdf:Group>
+  <xccdf:Group id="xccdf_org.testdata.benchmarks_group_2_Group_2">
+    <xccdf:title xml:lang="en">Group 2</xccdf:title>
+    <xccdf:description xml:lang="en">
+      <xhtml:p>This section is Group 2</xhtml:p>
+    </xccdf:description>
+    <xccdf:Group id="xccdf_org.testdata.benchmarks_group_2.1_Group_2_1">
+      <xccdf:title xml:lang="en">Group 2.1</xccdf:title>
+      <xccdf:description xml:lang="en">
+        <xhtml:p>This section is Group 2.1.</xhtml:p>
+      </xccdf:description>
+      <xccdf:Rule id="xccdf_org.testdata.benchmarks_rule_2.1.1_L1_Rule_3" role="full" selected="false" weight="1.0">
+        <xccdf:title xml:lang="en">(L1) Rule 3</xccdf:title>
+        <xccdf:description xml:lang="en">
+          <xhtml:p>This policy setting determines the number of things</xhtml:p>
+          <xhtml:p>
+The recommended state for this setting is:             <xhtml:span class="inline_block">24</xhtml:span>
+.          </xhtml:p>
+        </xccdf:description>
+        <xccdf:metadata>
+          <controls:cis_controls xmlns:controls="http://cisecurity.org/controls">
+            <controls:framework urn="urn:cisecurity.org:controls:8.0">
+              <controls:safeguard title="Centralize Account Management" urn="urn:cisecurity.org:controls:8.0:5:6">
+                <controls:implementation_groups ig2="true" ig3="true"/>
+                <controls:asset_type>Users</controls:asset_type>
+                <controls:security_function>Protect</controls:security_function>
+              </controls:safeguard>
+            </controls:framework>
+            <controls:framework urn="urn:cisecurity.org:controls:7.0">
+              <controls:safeguard title="Configure Centralized Point of Authentication" urn="urn:cisecurity.org:controls:7.0:16:2">
+                <controls:implementation_groups ig2="true" ig3="true"/>
+                <controls:asset_type>Users</controls:asset_type>
+                <controls:security_function>Protect</controls:security_function>
+              </controls:safeguard>
+            </controls:framework>
+          </controls:cis_controls>
+        </xccdf:metadata>
+        <xccdf:rationale xml:lang="en">
+          <xhtml:p>This should be implemented because of reasons.</xhtml:p>
+        </xccdf:rationale>
+        <xccdf:ident cc7:controlURI="http://cisecurity.org/20-cc/v7.0/control/16/subcontrol/2" system="http://cisecurity.org/20-cc/v7.0"/>
+        <xccdf:ident cc8:controlURI="http://cisecurity.org/20-cc/v8.0/control/5/subcontrol/6" system="http://cisecurity.org/20-cc/v8.0"/>
+        <xccdf:fixtext xml:lang="en">
+          <xhtml:div>
+            <xhtml:p>
+              <xhtml:p>
+To establish the recommended configuration via GP, set the following UI path to                 <xhtml:span class="inline_block">24</xhtml:span>
+:              </xhtml:p>
+              <xhtml:code class="code_block">Computer Configuration\Policies\Windows Settings\Rule 1 Settings</xhtml:code>
+              <xhtml:p class="bold">Impact:</xhtml:p>
+              <xhtml:p>
+                <xhtml:p>The major impact of this configuration is that bad things will happen without it set.</xhtml:p>
+              </xhtml:p>
+            </xhtml:p>
+          </xhtml:div>
+        </xccdf:fixtext>
+        <xccdf:complex-check operator="AND">
+          <check system="http://oval.mitre.org/XMLSchema/oval-definitions-5">
+            <check-export export-name="oval:org.testdata.benchmarks.test_xccdf:var:3" value-id="xccdf_org.testdata.benchmarks_value_3_var"/>
+            <check-content-ref href="Test_XCCDF_v1.0.0-oval.xml" name="oval:org.testdata.benchmarks.test_xccdf:def:3"/>
+          </check>
+        </xccdf:complex-check>
+      </xccdf:Rule>
+      <xccdf:Rule id="xccdf_org.testdata.benchmarks_rule_2.1.2_L2_Rule_6" role="full" selected="false" weight="1.0">
+        <xccdf:title xml:lang="en">(L2) Rule 6</xccdf:title>
+        <xccdf:description xml:lang="en">
+          <xhtml:p>Now you should pump this shit like they do in the future.</xhtml:p>
+          <xhtml:p>
+The recommended state for this setting is             <xhtml:span class="inline_block">24 or fewer</xhtml:span>
+.          </xhtml:p>
+        </xccdf:description>
+        <xccdf:metadata>
+          <controls:cis_controls xmlns:controls="http://cisecurity.org/controls">
+            <controls:framework urn="urn:cisecurity.org:controls:8.0">
+              <controls:safeguard title="Disable Dormant Accounts" urn="urn:cisecurity.org:controls:8.0:5:3">
+                <controls:implementation_groups ig1="true" ig2="true" ig3="true"/>
+                <controls:asset_type>Users</controls:asset_type>
+                <controls:security_function>Respond</controls:security_function>
+              </controls:safeguard>
+            </controls:framework>
+            <controls:framework urn="urn:cisecurity.org:controls:7.0">
+              <controls:safeguard title="Ensure All Accounts Have An Expiration Date" urn="urn:cisecurity.org:controls:7.0:16:10">
+                <controls:implementation_groups ig2="true" ig3="true"/>
+                <controls:asset_type>Users</controls:asset_type>
+                <controls:security_function>Protect</controls:security_function>
+              </controls:safeguard>
+            </controls:framework>
+          </controls:cis_controls>
+        </xccdf:metadata>
+        <xccdf:rationale xml:lang="en">
+          <xhtml:p>Now you should pump this shit like they do in the future.</xhtml:p>
+        </xccdf:rationale>
+        <xccdf:ident cc7:controlURI="http://cisecurity.org/20-cc/v7.0/control/16/subcontrol/10" system="http://cisecurity.org/20-cc/v7.0"/>
+        <xccdf:ident cc8:controlURI="http://cisecurity.org/20-cc/v8.0/control/5/subcontrol/3" system="http://cisecurity.org/20-cc/v8.0"/>
+        <xccdf:fixtext xml:lang="en">
+          <xhtml:div>
+            <xhtml:p>
+              <xhtml:p>
+To establish the recommended configuration via GP, set the following UI path to                 <xhtml:span class="inline_block">24 or fewer</xhtml:span>
+:              </xhtml:p>
+              <xhtml:code class="code_block">Computer Configuration\Policies\Windows Settings\Rule 4 Settings</xhtml:code>
+              <xhtml:p class="bold">Impact:</xhtml:p>
+              <xhtml:p>
+                <xhtml:p>If you don't, bad things will happen.</xhtml:p>
+              </xhtml:p>
+            </xhtml:p>
+          </xhtml:div>
+        </xccdf:fixtext>
+        <xccdf:complex-check operator="AND">
+          <check system="http://oval.mitre.org/XMLSchema/oval-definitions-5">
+            <check-export export-name="oval:org.testdata.benchmarks.test_xccdf:var:6" value-id="xccdf_org.testdata.benchmarks_value_6_var"/>
+            <check-content-ref href="Test_XCCDF_v1.0.0-oval.xml" name="oval:org.testdata.benchmarks.test_xccdf:def:6"/>
+          </check>
+        </xccdf:complex-check>
+      </xccdf:Rule>
+    </xccdf:Group>
+  </xccdf:Group>
+<xccdf:signature><ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+<ds:SignedInfo>
+<ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+<ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
+<ds:Reference URI="">
+<ds:Transforms>
+<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+<ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+</ds:Transforms>
+<ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
+<ds:DigestValue>3VvLYnVDN+qnFk+DGSrYhfGn124=</ds:DigestValue>
+</ds:Reference>
+</ds:SignedInfo>
+<ds:SignatureValue>
+sdfasdfahsdfahsdfjkahsdfahsdfklhasdlkfjhasdkljfhs==
+</ds:SignatureValue>
+<ds:KeyInfo>
+<ds:X509Data>
+<ds:X509Certificate>
+asdjkhfaskldfhasdkfhaskdjfhasdkjhaskdjfhaskldfhaskdjfhaskldjhfaskdjlfhasdaaa
+asdjkhfaskldfhasdkfhaskdjfhasdkjhaskdjfhaskldfhaskdjfhaskldjhfaskdjlfhasdaaa
+asdjkhfaskldfhasdkfhaskdjfhasdkjhaskdjfhaskldfhaskdjfhaskldjhfaskdjlfhasdaaa
+asdjkhfaskldfhasdkfhaskdjfhasdkjhaskdjfhaskldfhaskdjfhaskldjhfaskdjlfhasdaaa
+asdjkhfaskldfhasdkfhaskdjfhasdkjhaskdjfhaskldfhaskdjfhaskldjhfaskdjlfhasdaaa
+asdjkhfaskldfhasdkfhaskdjfhasdkjhaskdjfhaskldfhaskdjfhaskldjhfaskdjlfhasdaaa
+asdjkhfaskldfhasdkfhaskdjfhasdkjhaskdjfhaskldfhaskdjfhaskldjhfaskdjlfhasdaaa
+asdjkhfaskldfhasdkfhaskdjfhasdkjhaskdjfhaskldfhaskdjfhaskldjhfaskdjlfhasdaaa
+asdjkhfaskldfhasdkfhaskdjfhasdkjhaskdjfhaskldfhaskdjfhaskldjhfaskdjlfhasdaaa
+asdjkhfaskldfhasdkfhaskdjfhasdkjhaskdjfhaskldfhaskdjfhaskldjhfaskdjlfhasda==
+</ds:X509Certificate>
+</ds:X509Data>
+<ds:KeyValue>
+<ds:RSAKeyValue>
+<ds:Modulus>
+askjdhfasdkjfhasdkjfhaskdjlfhakjsdhfkjahsdfkjahsdfkj==
+</ds:Modulus>
+<ds:Exponent>AQAB</ds:Exponent>
+</ds:RSAKeyValue>
+</ds:KeyValue>
+</ds:KeyInfo>
+</ds:Signature></xccdf:signature></xccdf:Benchmark>

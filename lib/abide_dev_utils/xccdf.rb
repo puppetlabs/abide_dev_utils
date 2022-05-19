@@ -40,6 +40,13 @@ module AbideDevUtils
       AbideDevUtils::XCCDF::Diff.diff_benchmarks(bm1, bm2, opts)
     end
 
+    # Use new-style diff
+    def self.new_style_diff(file1, file2, opts)
+      require 'abide_dev_utils/xccdf/diff/benchmark'
+      bm_diff = AbideDevUtils::XCCDF::Diff::BenchmarkDiff.new(file1, file2, opts)
+      bm_diff.diff
+    end
+
     # Common constants and methods included by nearly everything else
     module Common
       XPATHS = {
@@ -336,69 +343,6 @@ module AbideDevUtils
         return normalized_title if prefix.nil?
 
         prefix.end_with?('::') ? "#{prefix}#{normalized_title}" : "#{prefix}::#{normalized_title}"
-      end
-    end
-
-    class ChangeSet
-      attr_reader :change, :key, :value, :value_to
-
-      def initialize(change:, key:, value:, value_to: nil)
-        validate_change(change)
-        @change = change
-        @key = key
-        @value = value
-        @value_to = value_to
-      end
-
-      def to_s
-        val_to_str = value_to.nil? ? ' ' : " to #{value_to} "
-        "#{change_string} value #{value}#{val_to_str}at #{key}"
-      end
-
-      def can_merge?(other)
-        return false unless (change == '-' && other.change == '+') || (change == '+' && other.change == '-')
-        return false unless key == other.key || value_hash_equality(other)
-
-        true
-      end
-
-      def merge(other)
-        unless can_merge?(other)
-          raise ArgumentError, 'Cannot merge. Possible causes: change is identical; key or value do not match'
-        end
-
-        new_to_value = value == other.value ? nil : other.value
-        ChangeSet.new(
-          change: '~',
-          key: key,
-          value: value,
-          value_to: new_to_value
-        )
-      end
-
-      private
-
-      def value_hash_equality(other)
-        equality = false
-        value.each do |k, v|
-          equality = true if v == other.value[k]
-        end
-        equality
-      end
-
-      def validate_change(change)
-        raise ArgumentError, "Change type #{change} in invalid" unless ['+', '-', '~'].include?(change)
-      end
-
-      def change_string
-        case change
-        when '-'
-          'remove'
-        when '+'
-          'add'
-        else
-          'change'
-        end
       end
     end
 

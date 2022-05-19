@@ -66,7 +66,7 @@ RSpec.describe 'AbideDevUtils::XCCDF' do
         let(:ctrl_name_fmt) { data[:ctrl_name_fmt] }
         let(:ctrl_num_fmt) { data[:ctrl_num_fmt] }
 
-        it 'has correct title ' do
+        it 'has correct title' do
           expect(benchmark.title).to eq(title)
         end
 
