@@ -34,6 +34,9 @@ module Abide
         options.on('-d [DIR]', '--files-output-directory [DIR]', 'Directory to save files data/mappings by default') do |d|
           @data[:dir] = d
         end
+        options.on('-V', '--version-output-dir', 'If saving to a directory, version the output directory') do
+          @data[:version_output_dir] = true
+        end
         options.on('-q', '--quiet', 'Show no output in the terminal') { @data[:quiet] = true }
         options.on('-p [PREFIX]', '--parent-key-prefix [PREFIX]', 'A prefix to append to the parent key') do |p|
           @data[:parent_key_prefix] = p
