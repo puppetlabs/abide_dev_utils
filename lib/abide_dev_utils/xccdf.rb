@@ -208,9 +208,12 @@ module AbideDevUtils
         profiles.select { |x| x.title == profile_title }.controls
       end
 
-      def gen_map(dir: nil, type: 'CIS', parent_key_prefix: '', **_)
+      def gen_map(dir: nil, type: 'cis', parent_key_prefix: '', version_output_dir: false, **_)
         os, ver = facter_platform
-        mapping_dir = dir ? File.expand_path(File.join(dir, type, os, ver)) : ''
+        output_path = [type, os, ver]
+        output_path.unshift(File.expand_path(dir)) if dir
+        output_path << version if version_output_dir
+        mapping_dir = File.expand_path(File.join(output_path))
         parent_key_prefix = '' if parent_key_prefix.nil?
         MAP_INDICES.each_with_object({}) do |idx, h|
           map_file_path = "#{mapping_dir}/#{idx}.yaml"

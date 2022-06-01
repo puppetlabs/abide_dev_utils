@@ -37,7 +37,7 @@ module Abide
 
       def execute
         client = JIRA.client
-        myself = JIRA.get_myself(client)
+        myself = JIRA.myself(client)
         return if myself.attrs['name'].empty?
 
         Abide::CLI::OUTPUT.simple("Successfully authenticated user #{myself.attrs['name']}!")
