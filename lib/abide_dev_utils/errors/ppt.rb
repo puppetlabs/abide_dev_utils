@@ -5,6 +5,10 @@ require 'abide_dev_utils/errors/base'
 module AbideDevUtils
   module Errors
     module Ppt
+      class NotModuleDirError < GenericError
+        @default = 'Path is not a Puppet module directory:'
+      end
+
       class ObjClassPathError < GenericError
         @default = 'Invalid path for class:'
       end
