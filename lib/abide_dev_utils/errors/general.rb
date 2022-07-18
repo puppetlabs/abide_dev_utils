@@ -9,7 +9,12 @@ module AbideDevUtils
       @default = 'Object is empty and should not be:'
     end
 
-    # Raised when a an object is initialized with a nil param
+    # Raised when something is not a string, or is an empty string
+    class NotPopulatedStringError < GenericError
+      @default = 'Object is either not a String or is empty:'
+    end
+
+    # Raised when an object is initialized with a nil param
     class NewObjectParamNilError < GenericError
       @default = 'Object init parameter is nil and should not be:'
     end
@@ -54,8 +59,9 @@ module AbideDevUtils
       @default = 'Object does not respond to #to_hash or #to_h:'
     end
 
+    # Raised when conflicting CLI options are specified for a command
     class CliOptionsConflict < GenericError
-      @default = "Console options conflict."
+      @default = 'Console options conflict:'
     end
   end
 end

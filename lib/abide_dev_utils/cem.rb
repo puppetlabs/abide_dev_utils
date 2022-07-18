@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'abide_dev_utils/xccdf'
+require 'abide_dev_utils/cem/generate'
 
 module AbideDevUtils
   # Methods for working with Compliance Enforcement Modules (CEM)

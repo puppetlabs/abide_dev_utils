@@ -4,6 +4,9 @@ require 'abide_dev_utils/output'
 require 'abide_dev_utils/validate'
 require 'abide_dev_utils/errors'
 require 'abide_dev_utils/ppt/class_utils'
+require 'abide_dev_utils/ppt/facter_utils'
+require 'abide_dev_utils/ppt/hiera'
+require 'abide_dev_utils/ppt/puppet_module'
 
 module AbideDevUtils
   module Ppt

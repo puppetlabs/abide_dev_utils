@@ -15,7 +15,44 @@ module Abide
       CMD_LONG = 'Namespace for commands related to Puppet CEM'
       def initialize
         super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: true)
+        add_command(CemGenerate.new)
         add_command(CemUpdateConfig.new)
+      end
+    end
+
+    class CemGenerate < AbideCommand
+      CMD_NAME = 'generate'
+      CMD_SHORT = 'Holds subcommands for generating objects / files'
+      CMD_LONG = 'Holds subcommands for generating objects / files'
+      def initialize
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: true)
+        add_command(CemGenerateReference.new)
+      end
+    end
+
+    class CemGenerateReference < AbideCommand
+      CMD_NAME = 'reference'
+      CMD_SHORT = 'Generates a reference doc for the module'
+      CMD_LONG = 'Generates a reference doc for the module'
+      def initialize
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
+        options.on('-o [FILE]', '--out-file [FILE]', 'Path to save the updated config file') do |o|
+          @data[:out_file] = o
+        end
+        options.on('-f [FORMAT]', '--format [FORMAT]', 'Format to save reference as') do |f|
+          @data[:format] = f
+        end
+        options.on('-v', '--verbose', 'Verbose output') do
+          @data[:verbose] = true
+        end
+        options.on('-q', '--quiet', 'Quiet output') do
+          @data[:quiet] = true
+        end
+      end
+
+      def execute
+        AbideDevUtils::Validate.puppet_module_directory
+        AbideDevUtils::CEM::Generate::Reference.generate(@data)
       end
     end
 
