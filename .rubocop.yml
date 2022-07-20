@@ -39,6 +39,9 @@ Style/IpAddresses:
   Exclude:
   - spec/rubocop/cop/style/ip_addresses_spec.rb
 
+Style/RegexpLiteral:
+  Enabled: false
+
 Layout/EndOfLine:
   EnforcedStyle: lf
 
@@ -133,4 +136,7 @@ Performance/CollectionLiteralInLoop:
     - 'spec/**/*.rb'
 
 RSpec/StubbedMock:
+  Enabled: false
+
+Convention/ExplicitBlockArgument:
   Enabled: false

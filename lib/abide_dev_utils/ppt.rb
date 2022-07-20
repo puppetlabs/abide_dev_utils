@@ -66,11 +66,6 @@ module AbideDevUtils
       AbideDevUtils::Output.simple('Successfully fixed all classes.')
     end
 
-    def self.generate_coverage_report(puppet_class_dir, hiera_path, profile = nil)
-      require 'abide_dev_utils/ppt/coverage'
-      CoverageReport.generate(puppet_class_dir, hiera_path, profile)
-    end
-
     def self.build_new_object(type, name, opts)
       require 'abide_dev_utils/ppt/new_obj'
       AbideDevUtils::Ppt::NewObjectBuilder.new(

@@ -26,7 +26,50 @@ module Abide
       CMD_LONG = 'Holds subcommands for generating objects / files'
       def initialize
         super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: true)
+        add_command(CemGenerateCoverageReport.new)
         add_command(CemGenerateReference.new)
+      end
+    end
+
+    class CemGenerateCoverageReport < AbideCommand
+      CMD_NAME = 'coverage-report'
+      CMD_SHORT = 'Generates control coverage report'
+      CMD_LONG = <<-EOLC.chomp
+      Generates report of resources that are associated with controls in mapping data. This command must
+      be run from a module directory.
+      EOLC
+      def initialize
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
+        options.on('-o [FILE]', '--out-file [FILE]', 'Path to save the coverage report') { |f| @data[:file] = f }
+        options.on('-f [FORMAT]', '--format [FORMAT]', 'The format to output the report in (hash, json, yaml)') do |f|
+          @data[:format] = f
+        end
+        options.on('-I', '--ignore-benchmark-errors', 'Ignores errors while generating benchmark reports') do
+          @data[:ignore_all] = true
+        end
+        options.on('-v', '--verbose', 'Will output the report to the console') { @data[:verbose] = true }
+        options.on('-q', '--quiet', 'Will not output anything to the console') { @data[:quiet] = true }
+      end
+
+      def execute
+        file_name = @data.fetch(:file, 'coverage_report')
+        out_format = @data.fetch(:format, 'yaml')
+        quiet = @data.fetch(:quiet, false)
+        console = @data.fetch(:verbose, false) && !quiet
+        ignore_all = @data.fetch(:ignore_all, false)
+        AbideDevUtils::Output.simple('Generating coverage report...') unless quiet
+        coverage = AbideDevUtils::CEM::CoverageReport.basic_coverage(format_func: :to_h, ignore_benchmark_errors: ignore_all)
+        AbideDevUtils::Output.simple("Saving coverage report to #{file_name}...")
+        case out_format
+        when /yaml/i
+          AbideDevUtils::Output.yaml(coverage, console: console, file: file_name)
+        when /json/i
+          AbideDevUtils::Output.json(coverage, console: console, file: file_name)
+        else
+          File.open(file_name, 'w') do |f|
+            AbideDevUtils::Output.simple(coverage.to_s, stream: f)
+          end
+        end
       end
     end
 
