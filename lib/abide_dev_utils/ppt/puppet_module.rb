@@ -48,10 +48,12 @@ module AbideDevUtils
       private
 
       def find_supported_os
-        return {} unless metadata['operatingsystem_support']
+        return [] unless metadata['operatingsystem_support']
 
-        metadata['operatingsystem_support'].each_with_object({}) do |os, h|
-          h[os['operatingsystem']] = os['operatingsystemrelease']
+        metadata['operatingsystem_support'].each_with_object([]) do |os, arr|
+          os['operatingsystemrelease'].each do |r|
+            arr << "#{os['operatingsystem']}::#{r}"
+          end
         end
       end
 
