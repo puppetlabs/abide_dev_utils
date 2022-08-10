@@ -9,6 +9,7 @@ module AbideDevUtils
     module Parser
       def self.parse(file_path)
         doc = AbideDevUtils::Files::Reader.read(file_path)
+        doc.remove_namespaces!
         benchmark = AbideDevUtils::XCCDF::Parser::Objects::Benchmark.new(doc)
         Linker.resolve_links(benchmark)
         benchmark
@@ -24,6 +25,8 @@ module AbideDevUtils
         end
 
         def self.link_profile_rules(benchmark)
+          return unless benchmark.respond_to?(:profile)
+
           rules = benchmark.find_children_by_class(AbideDevUtils::XCCDF::Parser::Objects::Rule, recurse: true)
           benchmark.profile.each do |profile|
             profile.xccdf_select.each do |sel|
@@ -36,6 +39,8 @@ module AbideDevUtils
         end
 
         def self.link_rule_values(benchmark)
+          return unless benchmark.respond_to?(:value)
+
           rules = benchmark.find_children_by_class(AbideDevUtils::XCCDF::Parser::Objects::Rule, recurse: true)
           benchmark.value.each do |value|
             rules.each do |rule|

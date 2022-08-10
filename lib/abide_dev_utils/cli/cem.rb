@@ -44,8 +44,20 @@ module Abide
         options.on('-f [FORMAT]', '--format [FORMAT]', 'The format to output the report in (hash, json, yaml)') do |f|
           @data[:format] = f
         end
+        options.on('-B [BENCHMARK]', '--benchmark [BENCHMARK]', 'Specify the benchmark to show coverage for') do |x|
+          @data[:benchmark] = x
+        end
+        options.on('-P [PROFILE]', '--profile [PROFILE]', 'Specifiy the profile to show coverage for') do |x|
+          @data[:profile] = x
+        end
+        options.on('-L [LEVEL]', '--level [LEVEL]', 'Specify the level to show coverage for') do |l|
+          @data[:profile] = l
+        end
         options.on('-I', '--ignore-benchmark-errors', 'Ignores errors while generating benchmark reports') do
           @data[:ignore_all] = true
+        end
+        options.on('-X [XCCDF_DIR]', '--xccdf-dir [XCCDF_DIR]', 'If specified, the coverage report will be correlated with info from the benchmark XCCDF files') do |d|
+          @data[:xccdf_dir] = d
         end
         options.on('-v', '--verbose', 'Will output the report to the console') { @data[:verbose] = true }
         options.on('-q', '--quiet', 'Will not output anything to the console') { @data[:quiet] = true }
@@ -56,9 +68,15 @@ module Abide
         out_format = @data.fetch(:format, 'yaml')
         quiet = @data.fetch(:quiet, false)
         console = @data.fetch(:verbose, false) && !quiet
-        ignore_all = @data.fetch(:ignore_all, false)
+        generate_opts = {
+          benchmark: @data.fetch(:benchmark),
+          profile: @data.fetch(:profile),
+          level: @data.fetch(:level),
+          ignore_benchmark_errors: @data.fetch(:ignore_all, false),
+          xccdf_dir: @data.fetch(:xccdf_dir),
+        }
         AbideDevUtils::Output.simple('Generating coverage report...') unless quiet
-        coverage = AbideDevUtils::CEM::CoverageReport.basic_coverage(format_func: :to_h, ignore_benchmark_errors: ignore_all)
+        coverage = AbideDevUtils::CEM::Generate::CoverageReport.generate(format_func: :to_h, opts: generate_opts)
         AbideDevUtils::Output.simple("Saving coverage report to #{file_name}...")
         case out_format
         when /yaml/i

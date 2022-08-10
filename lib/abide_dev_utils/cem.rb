@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'abide_dev_utils/xccdf'
-require 'abide_dev_utils/cem/coverage_report'
 require 'abide_dev_utils/cem/generate'
 
 module AbideDevUtils

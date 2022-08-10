@@ -38,10 +38,13 @@ module AbideDevUtils
           @path = File.expand_path(path)
           raise "Hiera config file at path #{@path} not found!" unless File.file?(@path)
 
+          @root_dir = File.dirname(@path)
           @conf = YAML.load_file(File.expand_path(path))
           @by_name_path_store = {}
-          AbideDevUtils::Ppt::Hiera.default_datadir = @conf['defaults']['datadir'] if @conf['defaults'].key?('datadir')
           AbideDevUtils::Ppt::Hiera.facter_version = facter_version
+          if @conf['defaults'].key?('datadir')
+            AbideDevUtils::Ppt::Hiera.default_datadir = File.join(@root_dir, @conf['defaults']['datadir'])
+          end
         end
 
         def hierarchy

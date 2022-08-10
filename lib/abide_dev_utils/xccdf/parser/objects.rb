@@ -3,6 +3,7 @@
 require 'digest'
 require_relative './objects/digest_object'
 require_relative './objects/numbered_object'
+require_relative './helpers'
 
 module AbideDevUtils
   module XCCDF
@@ -12,6 +13,9 @@ module AbideDevUtils
         # Base class for XCCDF element objects
         class ElementBase
           include AbideDevUtils::XCCDF::Parser::Objects::DigestObject
+          include AbideDevUtils::XCCDF::Parser::Helpers::ElementChildren
+          include AbideDevUtils::XCCDF::Parser::Helpers::XPath
+          extend AbideDevUtils::XCCDF::Parser::Helpers::XPath
           attr_reader :children, :child_labels, :link_labels
 
           def initialize(*_args, **_kwargs)
@@ -25,10 +29,19 @@ module AbideDevUtils
 
           # For subclasses that are associated with a specific
           # XCCDF element, this method returns the element's
-          # xpath. Must be overridden by subclasses that
+          # xpath name. Must be overridden by subclasses that
           # implement this method.
           def self.xpath
             nil
+          end
+
+          # For subclasses that are associated with a specific
+          # XCCDF element that has valid namespace prefix,
+          # this method returns that namespaces. May be
+          # overridden by subclasses if they have a different
+          # valid namespace prefix.
+          def self.xmlns
+            'xccdf'
           end
 
           # Takes the last segment of the class name, splits on captial letters,
@@ -66,6 +79,8 @@ module AbideDevUtils
                                                   found
                                                 end
               @label_method_values[label_str]
+            elsif search_children.respond_to?(method_name)
+              search_children.send(method_name, *args, &block)
             else
               super
             end
@@ -93,83 +108,6 @@ module AbideDevUtils
             @label
           end
 
-          def recursive_select_children(children_to_search = children, &block)
-            search_hits = []
-            children_to_search.each do |child|
-              found = yield child
-              if found
-                search_hits << child
-              elsif child.respond_to?(:children)
-                search_hits << recursive_select_children(child.children, &block)
-              end
-            end
-            search_hits.flatten.compact.uniq
-          end
-
-          def recursive_find_child(children_to_search = children, &block)
-            rescursive_select_children(children_to_search, &block).first
-          end
-
-          def find_children_that_respond_to(method, recurse: false)
-            return recursive_select_children { |child| child.respond_to?(method) } if recurse
-
-            children.select { |c| c.respond_to?(method.to_sym) }
-          end
-
-          def find_children_by_class(klass, recurse: false)
-            return recursive_select_children { |child| child.instance_of?(klass) } if recurse
-
-            children.select { |child| child.instance_of?(klass) }
-          end
-
-          def find_child_by_class(klass, recurse: false)
-            return recursive_find_child { |child| child.is_a?(klass) } if recurse
-
-            find_children_by_class(klass).first
-          end
-
-          def find_children_by_xpath(xpath, recurse: false)
-            return recursive_select_children { |child| child.xpath == xpath } if recurse
-
-            children.select { |child| child.xpath == xpath }
-          end
-
-          def find_child_by_xpath(xpath, recurse: false)
-            return recursive_find_child { |child| child.xpath == xpath } if recurse
-
-            find_children_by_xpath(xpath).first
-          end
-
-          def find_children_by_attribute(attribute, recurse: false)
-            pr = proc do |child|
-              next unless child.instance_of?(AbideDevUtils::XCCDF::Parser::Objects::AttributeValue)
-
-              child.attribute == attribute
-            end
-            return recursive_select_children(&pr) if recurse
-
-            children.select(&pr)
-          end
-
-          def find_child_by_attribute(attribute, recurse: false)
-            find_children_by_attribute(attribute, recurse: recurse).first
-          end
-
-          def find_children_by_attribute_value(attribute, value, recurse: false)
-            pr = proc do |child|
-              next unless child.instance_of?(AbideDevUtils::XCCDF::Parser::Objects::AttributeValue)
-
-              child.attribute == attribute && child.value == value
-            end
-            return recursive_select_children(&pr) if recurse
-
-            children.select(&pr)
-          end
-
-          def find_child_by_attribute_value(attribute, value, recurse: false)
-            find_children_by_attribute_value(attribute, value, recurse: recurse).first
-          end
-
           def add_link(object)
             @links << object
             @link_labels << object.label unless @link_labels.include?(object.label)
@@ -187,22 +125,10 @@ module AbideDevUtils
             default
           end
 
-          def namespace_safe_xpath(element, path)
-            element.xpath(path)
-          rescue Nokogiri::XML::XPath::SyntaxError
-            element.xpath("*[name()='#{path}']")
-          end
-
-          def namespace_safe_at_xpath(element, path)
-            element.at_xpath(path)
-          rescue Nokogiri::XML::XPath::SyntaxError
-            element.at_xpath("*[name()='#{path}']")
-          end
-
           def add_child(klass, element, *args, **kwargs)
             return if element.nil?
 
-            real_element = klass.xpath.nil? ? element : namespace_safe_at_xpath(element, klass.xpath)
+            real_element = klass.xpath.nil? ? element : find_element.at_xpath(element, klass.xpath)
             return if real_element.nil?
 
             obj = new_object(klass, real_element, *args, **kwargs)
@@ -219,7 +145,7 @@ module AbideDevUtils
           def add_children(klass, element, *args, **kwargs)
             return if element.nil?
 
-            real_elements = klass.xpath.nil? ? element : namespace_safe_xpath(element, klass.xpath)
+            real_elements = klass.xpath.nil? ? element : find_element.xpath(element, klass.xpath)
             return if real_elements.nil?
 
             real_elements.each do |e|
@@ -294,11 +220,11 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:title'
+            'title'
           end
 
           def to_s
-            find_child_by_class(ShortText).to_s
+            search_children.find_child_by_class(ShortText).to_s
           end
         end
 
@@ -310,11 +236,11 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:description'
+            'description'
           end
 
           def to_s
-            find_child_by_class(LongText).to_s
+            search_children.find_child_by_class(LongText).to_s
           end
         end
 
@@ -325,7 +251,7 @@ module AbideDevUtils
           def initialize(element)
             super
             add_child(AttributeValue, element, 'id')
-            @id = find_child_by_attribute('id').value.to_s
+            @id = search_children.find_child_by_attribute('id').value.to_s
           end
 
           def to_s
@@ -340,7 +266,7 @@ module AbideDevUtils
           def initialize(element)
             super
             add_child(AttributeValue, element, 'idref')
-            @idref = find_child_by_attribute('idref').value.to_s
+            @idref = search_children.find_child_by_attribute('idref').value.to_s
           end
 
           def to_s
@@ -356,7 +282,7 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:select'
+            'select'
           end
         end
 
@@ -378,7 +304,7 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:Profile'
+            'Profile'
           end
         end
 
@@ -389,7 +315,7 @@ module AbideDevUtils
 
           def initialize(element)
             super
-            @number = to_s[/group_([0-9]+\.)+[0-9]+|group_([0-9]+)/].gsub(/group_/, '')
+            @number = to_s[/group_([0-9]+\.)+[0-9]+|group_([0-9]+)/]&.gsub(/group_/, '')
             add_child(Title, element)
             add_child(Description, element)
             add_children(Group, element)
@@ -397,7 +323,7 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:Group'
+            'Group'
           end
         end
 
@@ -410,11 +336,11 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:check-export'
+            'check-export'
           end
 
           def to_s
-            [find_child_by_attribute('export-name').to_s, find_child_by_attribute('value-id').to_s].join('|')
+            [search_children.find_child_by_attribute('export-name').to_s, search_children.find_child_by_attribute('value-id').to_s].join('|')
           end
         end
 
@@ -427,11 +353,11 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:check-content-ref'
+            'check-content-ref'
           end
 
           def to_s
-            [find_child_by_attribute('href').to_s, find_child_by_attribute('name').to_s].join('|')
+            [search_children.find_child_by_attribute('href').to_s, search_children.find_child_by_attribute('name').to_s].join('|')
           end
         end
 
@@ -445,7 +371,7 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:check'
+            'check'
           end
         end
 
@@ -484,7 +410,7 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:ident'
+            'ident'
           end
 
           def to_s
@@ -503,7 +429,7 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:complex-check'
+            'complex-check'
           end
         end
 
@@ -514,18 +440,24 @@ module AbideDevUtils
             add_child(ShortText, element['title'])
             add_child(ShortText, element['urn'])
             new_implementation_groups(element)
-            add_child(ShortText, namespace_safe_at_xpath(element, 'controls:asset_type').text)
-            add_child(ShortText, namespace_safe_at_xpath(element, 'controls:security_function').text)
+            add_child(ShortText, find_element.at_xpath(element, 'asset_type').text)
+            add_child(ShortText, find_element.at_xpath(element, 'security_function').text)
           end
 
           def self.xpath
-            'controls:safeguard'
+            'safeguard'
+          end
+
+          def self.xmlns
+            'controls'
           end
 
           private
 
           def new_implementation_groups(element)
-            igroup = namespace_safe_at_xpath(element, 'controls:implementation_groups')
+            igroup = find_element.at_xpath(element, 'implementation_groups')
+            return if igroup.nil? || igroup.empty?
+
             add_child(ShortText, igroup['ig1']) if igroup['ig1']
             add_child(ShortText, igroup['ig2']) if igroup['ig2']
             add_child(ShortText, igroup['ig3']) if igroup['ig3']
@@ -541,7 +473,11 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'controls:framework'
+            'framework'
+          end
+
+          def self.xmlns
+            'controls'
           end
         end
 
@@ -549,14 +485,21 @@ module AbideDevUtils
         class MetadataCisControls < ElementBase
           def initialize(element, parent: nil)
             super
-            add_child(AttributeValue, element, 'xmlns:controls')
+            add_child(AttributeValue, element, 'controls')
             add_children(MetadataCisControlsFramework, element)
           end
 
           def self.xpath
-            'controls:cis_controls'
+            'cis_controls'
+          end
+
+          def self.xmlns
+            'controls'
           end
         end
+
+        # class MetadataNotes < ElementBase
+        #   def initialize()
 
         # Class for XCCDF rule metadata element
         class Metadata < ElementBase
@@ -566,7 +509,7 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:metadata'
+            'metadata'
           end
         end
 
@@ -582,7 +525,7 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:rationale'
+            'rationale'
           end
 
           def to_s
@@ -598,15 +541,15 @@ module AbideDevUtils
           end
 
           def digest
-            @digest ||= find_child_by_class(LongText).digest
+            @digest ||= search_children.find_child_by_class(LongText).digest
           end
 
           def self.xpath
-            'xccdf:fixtext'
+            'fixtext'
           end
 
           def to_s
-            find_child_by_class(LongText).to_s
+            search_children.find_child_by_class(LongText).to_s
           end
         end
 
@@ -632,7 +575,7 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:Rule'
+            'Rule'
           end
         end
 
@@ -644,15 +587,15 @@ module AbideDevUtils
             add_child(AttributeValue, element, 'type')
             add_child(Title, element)
             add_child(Description, element)
-            add_child(ShortText, element.at_xpath('xccdf:value'))
+            add_child(ShortText, find_element.at_xpath(element, 'value'))
           end
 
           def self.xpath
-            'xccdf:Value'
+            'Value'
           end
 
           def to_s
-            find_child_by_class(Title).to_s
+            search_children.find_child_by_class(Title).to_s
           end
         end
 
@@ -665,13 +608,13 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:status'
+            'status'
           end
 
           def to_s
             [
-              "Status:#{find_child_by_class(ShortText)}",
-              "Date:#{find_child_by_class(AttributeValue)}",
+              "Status:#{search_children.find_child_by_class(ShortText)}",
+              "Date:#{search_children.find_child_by_class(AttributeValue)}",
             ].join('|')
           end
         end
@@ -684,11 +627,11 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:version'
+            'version'
           end
 
           def to_s
-            find_child_by_class(ShortText).to_s
+            search_children.find_child_by_class(ShortText).to_s
           end
         end
 
@@ -700,11 +643,11 @@ module AbideDevUtils
           end
 
           def self.xpath
-            'xccdf:platform'
+            'platform'
           end
 
           def to_s
-            find_child_by_class(AttributeValue).to_s
+            search_children.find_child_by_class(AttributeValue).to_s
           end
         end
 
@@ -714,25 +657,25 @@ module AbideDevUtils
 
           def initialize(element)
             super
-            element = element.at_xpath('xccdf:Benchmark')
-            raise 'No Benchmark element found' if element.nil?
+            elem = find_element.at_xpath(element, 'Benchmark')
+            raise 'No Benchmark element found' if elem.nil?
 
-            add_child(Status, element)
-            add_child(Title, element)
-            add_child(Description, element)
-            add_child(Platform, element)
-            add_child(Version, element)
-            add_children(Profile, element)
-            add_children(Group, element)
-            add_children(Value, element)
+            add_child(Status, elem)
+            add_child(Title, elem)
+            add_child(Description, elem)
+            add_child(Platform, elem)
+            add_child(Version, elem)
+            add_children(Profile, elem)
+            add_children(Group, elem)
+            add_children(Value, elem)
           end
 
           def self.xpath
-            'xccdf:Benchmark'
+            'Benchmark'
           end
 
           def to_s
-            [find_child_by_class(Title).to_s, find_child_by_class(Version).to_s].join(' ')
+            [search_children.find_child_by_class(Title).to_s, search_children.find_child_by_class(Version).to_s].join(' ')
           end
         end
       end

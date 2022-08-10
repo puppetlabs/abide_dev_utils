@@ -14,6 +14,7 @@ module AbideDevUtils
         readme: 'README.md',
         reference: 'REFERENCE.md',
         changelog: 'CHANGELOG.md',
+        hiera_config: 'hiera.yaml',
         fixtures: '.fixtures.yml',
         rubocop: '.rubocop.yml',
         sync: '.sync.yml',
@@ -42,7 +43,7 @@ module AbideDevUtils
       end
 
       def hiera_conf
-        @hiera_conf ||= AbideDevUtils::Ppt::Hiera::Config.new
+        @hiera_conf ||= AbideDevUtils::Ppt::Hiera::Config.new(special_files[:hiera_config])
       end
 
       private
