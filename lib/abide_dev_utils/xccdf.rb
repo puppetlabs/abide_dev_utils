@@ -70,6 +70,7 @@ module AbideDevUtils
       CIS_LEVEL_CODE = /(?:_|^)([Ll]evel_[0-9]|[Ll]1|[Ll]2|[NnBb][GgLl]|#{CIS_NEXT_GEN_WINDOWS})/.freeze
       CIS_CONTROL_PARTS = /#{CIS_CONTROL_NUMBER}#{CIS_LEVEL_CODE}?_+([A-Za-z].*)/.freeze
       CIS_PROFILE_PARTS = /#{CIS_LEVEL_CODE}[_-]+([A-Za-z].*)/.freeze
+      STIG_PROFILE_PARTS = /(STIG)/.freeze
 
       def xpath(path)
         @xml.xpath(path)
@@ -119,6 +120,8 @@ module AbideDevUtils
       end
 
       def profile_parts(profile)
+        return ['STIG', ''] if profile == 'STIG'
+
         parts = control_profile_text(profile).match(CIS_PROFILE_PARTS)
         raise AbideDevUtils::Errors::ProfilePartsError, profile if parts.nil?
 

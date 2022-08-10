@@ -27,7 +27,7 @@ module AbideDevUtils
       def self.path_from_class_name(class_name)
         parts = class_name.split('::')
         parts[-1] = "#{parts[-1]}.pp"
-        File.expand_path(File.join('manifests', parts[1..-1]))
+        File.expand_path(File.join('manifests', parts[1..]))
       end
 
       # Returns the namespaced class name from a file path

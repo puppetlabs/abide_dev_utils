@@ -18,5 +18,15 @@ module AbideDevUtils
     class ResourceDataNotFoundError < GenericError
       @default = 'Resource data not found using facts:'
     end
+
+    # Raised by Control when it can't find mapping data for itself
+    class NoMappingDataForControlError < GenericError
+      @default = 'No mapping data found for control:'
+    end
+
+    # Raised by a control when it's given ID and framework are incompatible
+    class ControlIdFrameworkMismatchError < GenericError
+      @default = 'Control ID is invalid with the given framework:'
+    end
   end
 end

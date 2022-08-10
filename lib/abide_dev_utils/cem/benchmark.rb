@@ -1,14 +1,313 @@
 # frozen_string_literal: true
 
+require 'set'
+require 'abide_dev_utils/dot_number_comparable'
 require 'abide_dev_utils/errors'
-require 'abide_dev_utils/ppt/facter_utils'
+require 'abide_dev_utils/ppt'
 require 'abide_dev_utils/cem/mapping/mapper'
 
 module AbideDevUtils
   module CEM
-    # Repesents a benchmark for purposes of organizing data for markdown representation
+    # Represents a resource data resource statement
+    class Resource
+      attr_reader :title, :type
+
+      def initialize(title, data, framework, mapper)
+        @title = title
+        @data = data
+        @type = data['type']
+        @framework = framework
+        @mapper = mapper
+        @dependent = []
+      end
+
+      def manifest
+        @manifest ||= load_manifest
+      end
+
+      def manifest?
+        !manifest.nil?
+      end
+
+      def file_path
+        @file_path ||= AbideDevUtils::Ppt::ClassUtils.path_from_class_name((type == 'class' ? title : type))
+      end
+
+      def controls
+        @controls || load_controls
+      end
+
+      def cem_options?
+        !cem_options.empty?
+      end
+
+      def cem_options
+        @cem_options ||= resource_properties('cem_options')
+      end
+
+      def cem_protected?
+        !cem_protected.empty?
+      end
+
+      def cem_protected
+        @cem_protected ||= resource_properties('cem_protected')
+      end
+
+      def dependent_controls
+        @dependent_controls ||= @dependent.flatten.uniq.filter_map { |x| controls.find { |y| y.id == x } }
+      end
+
+      def to_reference
+        "#{type.split('::').map(&:capitalize).join('::')}['#{title}']"
+      end
+
+      private
+
+      attr_reader :data, :framework, :mapper
+
+      def load_manifest
+        AbideDevUtils::Ppt::CodeIntrospection::Manifest.new(file_path)
+      rescue StandardError
+        nil
+      end
+
+      def resource_properties(prop_name)
+        props = Set.new
+        return props unless data.key?(prop_name)
+
+        data[prop_name].each do |param, param_val|
+          props << { name: param,
+                     type: ruby_class_to_puppet_type(param_val.class.to_s),
+                     default: param_val }
+        end
+        props
+      end
+
+      def load_controls
+        if data['controls'].respond_to?(:keys)
+          load_hash_controls(data['controls'], framework, mapper)
+        elsif data['controls'].respond_to?(:each_with_index)
+          load_array_controls(data['controls'], framework, mapper)
+        else
+          raise "Control type is invalid. Type: #{data['controls'].class}"
+        end
+      end
+
+      def load_hash_controls(ctrls, framework, mapper)
+        ctrls.each_with_object([]) do |(name, data), arr|
+          if name == 'dependent'
+            @dependent << data
+            next
+          end
+          ctrl = Control.new(name, data, self, framework, mapper)
+          arr << ctrl
+        rescue AbideDevUtils::Errors::ControlIdFrameworkMismatchError,
+               AbideDevUtils::Errors::NoMappingDataForControlError
+          next
+        end
+      end
+
+      def load_array_controls(ctrls, framework, mapper)
+        ctrls.each_with_object([]) do |c, arr|
+          if c == 'dependent'
+            @dependent << c
+            next
+          end
+          ctrl = Control.new(c, 'no_params', self, framework, mapper)
+          arr << ctrl
+        rescue AbideDevUtils::Errors::ControlIdFrameworkMismatchError,
+               AbideDevUtils::Errors::NoMappingDataForControlError
+          next
+        end
+      end
+
+      def ruby_class_to_puppet_type(class_name)
+        pup_type = class_name.split('::').last.capitalize
+        case pup_type
+        when %r{(Trueclass|Falseclass)}
+          'Boolean'
+        when %r{(String|Pathname)}
+          'String'
+        when %r{(Integer|Fixnum)}
+          'Integer'
+        when %r{(Float|Double)}
+          'Float'
+        when %r{Nilclass}
+          'Optional'
+        else
+          pup_type
+        end
+      end
+    end
+
+    # Represents a singular rule in a benchmark
+    class Control
+      include AbideDevUtils::DotNumberComparable
+      attr_reader :id, :params, :resource, :framework, :dependent
+
+      def initialize(id, params, resource, framework, mapper)
+        validate_id_with_framework(id, framework, mapper)
+        @id = id
+        @params = params
+        @resource = resource
+        @framework = framework
+        @mapper = mapper
+        raise AbideDevUtils::Errors::NoMappingDataForControlError, @id unless @mapper.get(id)
+      end
+
+      def params?
+        !(params.nil? || params.empty? || params == 'no_params') || (resource.cem_options? || resource.cem_protected?)
+      end
+
+      def resource_properties?
+        resource.cem_options? || resource.cem_protected?
+      end
+
+      def param_hashes
+        return [no_params] unless params?
+
+        params.each_with_object([]) do |(param, param_val), ar|
+          ar << { name: param,
+                  type: ruby_class_to_puppet_type(param_val.class.to_s),
+                  default: param_val }
+        end
+      end
+
+      def alternate_ids(level: nil, profile: nil)
+        id_map = @mapper.get(id, level: level, profile: profile)
+        if display_title_type.to_s == @mapper.map_type(id)
+          id_map
+        else
+          alt_ids = id_map.each_with_object([]) do |mapval, arr|
+            arr << if display_title_type.to_s == @mapper.map_type(mapval)
+                     @mapper.get(mapval, level: level, profile: profile)
+                   else
+                     mapval
+                   end
+          end
+          alt_ids.flatten.uniq
+        end
+      end
+
+      def id_map_type
+        @mapper.map_type(id)
+      end
+
+      def display_title
+        send(display_title_type) unless display_title_type.nil?
+      end
+
+      def levels
+        levels_and_profiles[0]
+      end
+
+      def profiles
+        levels_and_profiles[1]
+      end
+
+      def valid_maps?
+        valid = AbideDevUtils::CEM::Mapping::FRAMEWORK_TYPES[framework].each_with_object([]) do |mtype, arr|
+          arr << if @mapper.map_type(id) == mtype
+                   id
+                 else
+                   @mapper.get(id).find { |x| @mapper.map_type(x) == mtype }
+                 end
+        end
+        valid.compact.length == AbideDevUtils::CEM::Mapping::FRAMEWORK_TYPES[framework].length
+      end
+
+      def method_missing(meth, *args, &block)
+        meth_s = meth.to_s
+        if AbideDevUtils::CEM::Mapping::ALL_TYPES.include?(meth_s)
+          @mapper.get(id).find { |x| @mapper.map_type(x) == meth_s }
+        else
+          super
+        end
+      end
+
+      def respond_to_missing?(meth, include_private = false)
+        AbideDevUtils::CEM::Mapping::ALL_TYPES.include?(meth.to_s) || super
+      end
+
+      def to_h
+        {
+          id: id,
+          display_title: display_title,
+          alternate_ids: alternate_ids,
+          levels: levels,
+          profiles: profiles,
+          params: param_hashes,
+          resource: resource.to_stubbed_h,
+        }
+      end
+
+      private
+
+      def display_title_type
+        if (!vulnid.nil? && !vulnid.is_a?(String)) || !title.is_a?(String)
+          nil
+        elsif framework == 'stig' && vulnid
+          :vulnid
+        else
+          :title
+        end
+      end
+
+      def validate_id_with_framework(id, framework, mapper)
+        mtype = mapper.map_type(id)
+        return if AbideDevUtils::CEM::Mapping::FRAMEWORK_TYPES[framework].include?(mtype)
+
+        raise AbideDevUtils::Errors::ControlIdFrameworkMismatchError, [id, mtype, framework]
+      end
+
+      def map
+        @map ||= @mapper.get(id)
+      end
+
+      def levels_and_profiles
+        @levels_and_profiles ||= find_levels_and_profiles
+      end
+
+      def find_levels_and_profiles
+        lvls = []
+        profs = []
+        @mapper.levels.each do |lvl|
+          @mapper.profiles.each do |prof|
+            unless @mapper.get(id, level: lvl, profile: prof).nil?
+              lvls << lvl
+              profs << prof
+            end
+          end
+        end
+        [lvls.flatten.compact.uniq, profs.flatten.compact.uniq]
+      end
+
+      def ruby_class_to_puppet_type(class_name)
+        pup_type = class_name.split('::').last.capitalize
+        case pup_type
+        when %r{(Trueclass|Falseclass)}
+          'Boolean'
+        when %r{(String|Pathname)}
+          'String'
+        when %r{(Integer|Fixnum)}
+          'Integer'
+        when %r{(Float|Double)}
+          'Float'
+        when %r{Nilclass}
+          'Optional'
+        else
+          pup_type
+        end
+      end
+
+      def no_params
+        { name: 'No parameters', type: nil, default: nil }
+      end
+    end
+
+    # Repesents a benchmark based on resource and mapping data
     class Benchmark
-      attr_reader :osname, :major_version, :os_facts, :osfamily, :hiera_conf, :module_name, :framework, :rules
+      attr_reader :osname, :major_version, :os_facts, :osfamily, :hiera_conf, :module_name, :framework
 
       def initialize(osname, major_version, hiera_conf, module_name, framework: 'cis')
         @osname = osname
@@ -18,10 +317,8 @@ module AbideDevUtils
         @hiera_conf = hiera_conf
         @module_name = module_name
         @framework = framework
-        @rules = {}
         @map_cache = {}
         @rules_in_map = {}
-        load_rules
       end
 
       # Creates Benchmark objects from a Puppet module
@@ -38,21 +335,45 @@ module AbideDevUtils
           if majver.is_a?(Array)
             majver.sort.each do |v|
               frameworks.each do |fw|
-                benchmark = Benchmark.new(osname, v, pupmod.hiera_conf, pupmod.name(strip_namespace: true), framework: fw)
+                benchmark = Benchmark.new(osname,
+                                          v,
+                                          pupmod.hiera_conf,
+                                          pupmod.name(strip_namespace: true),
+                                          framework: fw)
+                benchmark.controls
                 ary << benchmark
+              rescue AbideDevUtils::Errors::MappingDataFrameworkMismatchError => e
+                raise e unless ignore_all_errors || ignore_framework_mismatch
               rescue StandardError => e
-                raise e unless ignore_all_errors || (e.instance_of?(AbideDevUtils::Errors::MappingDataFrameworkMismatchError) && ignore_framework_mismatch)
+                raise e unless ignore_all_errors
               end
             end
           else
             frameworks.each do |fw|
-              benchmark = Benchmark.new(osname, majver, pupmod.hiera_conf, pupmod.name(strip_namespace: true), framework: fw)
+              benchmark = Benchmark.new(osname,
+                                        majver,
+                                        pupmod.hiera_conf,
+                                        pupmod.name(strip_namespace: true),
+                                        framework: fw)
+              benchmark.controls
               ary << benchmark
+            rescue AbideDevUtils::Errors::MappingDataFrameworkMismatchError => e
+              raise e unless ignore_all_errors || ignore_framework_mismatch
             rescue StandardError => e
-              raise e unless ignore_all_errors || (e.instance_of?(AbideDevUtils::Errors::MappingDataFrameworkMismatchError) && ignore_framework_mismatch)
+              raise e unless ignore_all_errors
             end
           end
         end
+      end
+
+      def resources
+        @resources ||= resource_data["#{module_name}::resources"].each_with_object([]) do |(rtitle, rdata), arr|
+          arr << Resource.new(rtitle, rdata, framework, mapper)
+        end
+      end
+
+      def controls
+        @controls ||= resources.map(&:controls).flatten.sort
       end
 
       def mapper
@@ -113,131 +434,6 @@ module AbideDevUtils
 
       private
 
-      def load_rules
-        resource_data["#{module_name}::resources"].each do |_, rdata|
-          unless rdata.key?('controls')
-            puts "Controls key not found in #{rdata}"
-            next
-          end
-          rdata['controls'].each do |control, control_data|
-            rule_title = map(control)
-            next if rule_title.nil? || rule_title.empty?
-
-            rule_title.find { |id| map_type(id) == 'title' }
-            alternate_ids = map(rule_title)
-
-            next unless rule_title.is_a?(String)
-
-            @rules[rule_title] = {} unless @rules&.key?(rule_title)
-            @rules[rule_title]['number'] = alternate_ids.find { |id| map_type(id) == 'number' }
-            @rules[rule_title]['alternate_ids'] = alternate_ids
-            @rules[rule_title]['params'] = [] unless @rules[rule_title].key?('params')
-            @rules[rule_title]['level'] = [] unless @rules[rule_title].key?('level')
-            @rules[rule_title]['profile'] = [] unless @rules[rule_title].key?('profile')
-            param_hashes(control_data).each do |param_hash|
-              next if @rules[rule_title]['params'].include?(param_hash[:name])
-
-              @rules[rule_title]['params'] << param_hash
-            end
-            levels, profiles = find_levels_and_profiles(control)
-            unless @rules[rule_title]['level'] == levels
-              @rules[rule_title]['level'] = @rules[rule_title]['level'] | levels
-            end
-            unless @rules[rule_title]['profile'] == profiles
-              @rules[rule_title]['profile'] = @rules[rule_title]['profile'] | profiles
-            end
-            @rules[rule_title]['resource'] = rdata['type']
-          end
-        end
-        @rules = sort_rules
-      end
-
-      def param_hashes(control_data)
-        return [] if control_data.nil? || control_data.empty?
-
-        p_hashes = []
-        if !control_data.respond_to?(:each) && control_data == 'no_params'
-          p_hashes << no_params
-        else
-          control_data.each do |param, param_val|
-            p_hashes << {
-              name: param,
-              type: ruby_class_to_puppet_type(param_val.class.to_s),
-              default: param_val,
-            }
-          end
-        end
-        p_hashes
-      end
-
-      def no_params
-        { name: 'No parameters', type: nil, default: nil }
-      end
-
-      # We sort the rules by their control number so they
-      # appear in the REFERENCE in benchmark order
-      def sort_rules
-        sorted = @rules.dup.sort_by do |_, v|
-          control_num_to_int(v['number'])
-        end
-        sorted.to_h
-      end
-
-      # In order to sort the rules by their control number,
-      # we need to convert the control number to an integer.
-      # This is a rough conversion, but should be sufficient
-      # for the purposes of sorting. The multipliers are
-      # the 20th, 15th, 10th, and 5th numbers in the Fibonacci
-      # sequence, then 1 after that. The reason for this is to
-      # ensure a "spiraled" wieghting of the sections in the control
-      # number, with 1st section having the most sorting weight, 2nd
-      # having second most, etc. However, the differences in the multipliers
-      # are such that it would be difficult for the product of a lesser-weighted
-      # section to be greater than a greater-weighted section.
-      def control_num_to_int(control_num)
-        multipliers = [6765, 610, 55, 5, 1]
-        nsum = 0
-        midx = 0
-        control_num.split('.').each do |num|
-          multiplier = midx >= multipliers.length ? 1 : multipliers[midx]
-          nsum += num.to_i * multiplier
-          midx += 1
-        end
-        nsum
-      end
-
-      def find_levels_and_profiles(control_id)
-        levels = []
-        profiles = []
-        mapper.each_like(control_id) do |lvl, profile_hash|
-          next if lvl == 'benchmark'
-
-          profile_hash.each do |prof, _|
-            unless map(control_id, level: lvl, profile: prof).nil?
-              levels << lvl
-              profiles << prof
-            end
-          end
-        end
-        [levels, profiles]
-      end
-
-      def ruby_class_to_puppet_type(class_name)
-        pup_type = class_name.split('::').last.capitalize
-        case pup_type
-        when %r{(Trueclass|Falseclass)}
-          'Boolean'
-        when %r{(String|Pathname)}
-          'String'
-        when %r{(Integer|Fixnum)}
-          'Integer'
-        when %r{(Float|Double)}
-          'Float'
-        else
-          pup_type
-        end
-      end
-
       def load_mapping_data
         files = case module_name
                 when /_windows$/
@@ -248,8 +444,6 @@ module AbideDevUtils
                   raise "Module name '#{module_name}' is not a CEM module"
                 end
         validate_mapping_files_framework(files).each_with_object({}) do |f, h|
-          next unless f.path.include?(framework)
-
           h[File.basename(f.path, '.yaml')] = YAML.load_file(f.path)
         end
       end

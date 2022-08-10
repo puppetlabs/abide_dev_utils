@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
 module AbideDevUtils
-  VERSION = "0.11.1"
+  module CEM
+    module HieraData; end
+  end
 end
