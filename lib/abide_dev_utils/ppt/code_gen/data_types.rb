@@ -29,6 +29,8 @@ module AbideDevUtils
           te = param.respond_to?(:type_expr) ? param.type_expr : param
           if te.respond_to? :left_expr
             display_type_expr_with_left_expr(te)
+          elsif te.respond_to? :entries
+            display_type_expr_with_entries(te)
           elsif te.respond_to? :cased_value
             te.cased_value
           elsif te.respond_to? :value
@@ -44,6 +46,17 @@ module AbideDevUtils
           keys = te.keys.map { |x| display_type_expr(x) }.to_s if te.respond_to? :keys
           keys.tr!('"', '') unless cased == 'Enum'
           "#{cased}#{keys}"
+        end
+
+        # Used by #display_type_expr
+        def display_type_expr_with_entries(te)
+          te.entries.each_with_object({}) do |x, hsh|
+            key = nil
+            val = nil
+            key = display_value(x.key) if x.respond_to? :key
+            val = display_type_expr(x.value) if x.respond_to? :value
+            hsh[key] = val if key
+          end
         end
       end
     end

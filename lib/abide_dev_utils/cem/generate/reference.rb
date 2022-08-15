@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'json'
+require 'shellwords'
 require 'timeout'
 require 'yaml'
 require 'abide_dev_utils/markdown'
@@ -58,6 +59,8 @@ module AbideDevUtils
 
         # Generates a markdown reference doc
         class MarkdownGenerator
+          SPECIAL_CONTROL_IDS = %w[dependent cem_options cem_protected].freeze
+
           def initialize(benchmarks, module_name, file: 'REFERENCE.md')
             @benchmarks = benchmarks
             @module_name = module_name
@@ -72,7 +75,7 @@ module AbideDevUtils
                                                             total: benchmark.controls.length)
               md.add_h1(benchmark.title_key)
               benchmark.controls.each do |control|
-                next if ['cem_options', 'cem_protected', 'dependent'].include? control.id
+                next if SPECIAL_CONTROL_IDS.include? control.id
                 next if benchmark.framework == 'stig' && control.id_map_type != 'vulnid'
 
                 control_md = ControlMarkdown.new(control, @md, @module_name, benchmark.framework)
@@ -91,12 +94,15 @@ module AbideDevUtils
           attr_reader :benchmarks, :md
         end
 
+        class ConfigExampleError < StandardError; end
+
         class ControlMarkdown
-          def initialize(control, md, module_name, framework)
+          def initialize(control, md, module_name, framework, formatter: nil)
             @control = control
             @md = md
             @module_name = module_name
             @framework = framework
+            @formatter = formatter.nil? ? TypeExprValueFormatter : formatter
             @control_data = {}
           end
 
@@ -128,7 +134,6 @@ module AbideDevUtils
             return unless @control.resource.manifest?
 
             @control.resource.manifest.declaration.parameters&.find { |x| x.name == "$#{ctrl_param[:name]}" }
-            #raise "Cannot find resource parameter for param #{ctrl_param[:name]}" unless rparam
           end
 
           def param_type_expr(ctrl_param, rsrc_param)
@@ -204,34 +209,108 @@ module AbideDevUtils
             @control.param_hashes.each do |param_hash|
               next if param_hash[:name] == 'No parameters'
 
-              val = if @control_data[param_hash[:name]][:default] &&
-                       @control_data[param_hash[:name]][:type_expr]&.match?(/String|Path/)
-                      "'#{@control_data[param_hash[:name]][:default]}'"
-                    elsif @control_data[param_hash[:name]][:default]
-                      @control_data[param_hash[:name]][:default]
-                    elsif @control_data[param_hash[:name]][:type_expr]
-                      "<#{@control_data[param_hash[:name]][:type_expr]}>"
-                    else
-                      'undef'
-                    end
+              val = @formatter.format(@control_data[param_hash[:name]][:default],
+                                      @control_data[param_hash[:name]][:type_expr],
+                                      optional_strategy: :placeholder)
               out_str << "#{indent}#{param_hash[:name]}: #{val}"
             end
             return if out_str.empty?
 
-            begin
-              out_str.unshift("    #{@control.title.dump}:")
-            rescue NoMethodError
-              require 'pry'
-              binding.pry
-            end
+            out_str.unshift("    #{@control.title.dump}:")
             out_str.unshift('  control_configs:')
             out_str.unshift("#{@module_name}::config:")
             @md.add_ul('Hiera Configuration Example:')
             @md.add_code_block(out_str.join("\n"), language: 'yaml')
+          rescue StandardError => e
+            err_msg = [
+              "Failed to generate config example for control #{@control.id}",
+              "Error: #{e.message}",
+              "Control: Data #{@control_data.inspect}",
+              e.backtrace.join("\n")
+            ].join("\n")
+            raise ConfigExampleError, err_msg
           end
 
           def resource_reference_builder
             @md.add_ul("Resource: #{@md.code(@control.resource.to_reference)}")
+          end
+        end
+
+        # Holds methods for formmating values based on type expressions
+        class TypeExprValueFormatter
+          UNDEF_VAL = 'undef'
+
+          # Formats a value based on a type expression.
+          # @param value [Any] the value to format
+          # @param type_expr [String] the type expression to use for formatting
+          # @param optional_strategy [Symbol] the strategy to use for optional values
+          # @return [Any] the formatted value
+          def self.format(value, type_expr, optional_strategy: :undef)
+            return value if value == 'No parameters'
+
+            case type_expr
+            when /^(String|Stdlib::(Unix|Windows|Absolute)path|Enum)/
+              quote(value)
+            when /^Optional\[/
+              optional(value, type_expr, strategy: optional_strategy)
+            else
+              return type_expr_placeholder(type_expr) if value.nil?
+
+              quote(value)
+            end
+          end
+
+          # Escapes and quotes a string. If value is not a string, returns value.
+          # @param value [Any] the string to quote.
+          # @return [String] the quoted string.
+          # @return [Any] the value if it is not a string.
+          def self.quote(value)
+            if value.is_a?(String)
+              value.inspect
+            else
+              value
+            end
+          end
+
+          # Checks if a value is considered undef.
+          # @param value [Any] the value to check.
+          # @return [Boolean] true if value is considered undef (nil or 'undef').
+          def self.undef?(value)
+            value.nil? || value == UNDEF_VAL
+          end
+
+          # Returns the display representation of the value with an Optional type expression.
+          # If the value is not nil or 'undef', returns the quoted form of the value.
+          # @param value [Any] the value to format.
+          # @param type_expr [String] the type expression.
+          # @param strategy [Symbol] the strategy to use. Valid strategies are :undef and :placeholder.
+          #   :undef will return 'undef' if the value is nil or 'undef'.
+          #   :placeholder will return a peeled type expression placeholder if the value is nil or 'undef'.
+          # @return [String] the formatted value.
+          # @return [Any] the quoted value if it is not nil.
+          def self.optional(value, type_expr, strategy: :undef)
+            return UNDEF_VAL if undef?(value) && strategy == :undef
+            return type_expr_placeholder(peel_type_expr(type_expr)) if undef?(value) && strategy == :placeholder
+
+            quote(value)
+          end
+
+          # Returns a "peeled" type expression. Peeling a type expression removes the
+          # first layer of the type expression. For example, if the type expression is
+          # Optional[String], the peeled type expression is String.
+          # @param type_expr [String] the type expression to peel.
+          # @return [String] the peeled type expression.
+          def self.peel_type_expr(type_expr)
+            return type_expr unless type_expr.include?('[')
+
+            type_expr.match(/^[A-Z][a-z0-9_]*\[(?<peeled>[A-Za-z0-9:,_{}=>\[\]\\\s]+)\]$/)[:peeled]
+          end
+
+          # Formats the type expression as a placeholder.
+          # @param type_expr [String] The type expression to format.
+          # @return [String] The formatted type expression.
+          def self.type_expr_placeholder(type_expr)
+            "<<Type #{type_expr}>>"
           end
         end
       end

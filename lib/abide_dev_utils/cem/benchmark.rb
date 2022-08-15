@@ -21,6 +21,11 @@ module AbideDevUtils
         @dependent = []
       end
 
+      # Returns a representation of the actual manifest backing this resource.
+      # This is used to gather information from the Puppet code about this
+      # resource.
+      # @return [AbideDevUtils::Ppt::CodeIntrospection::Manifest]
+      # @return [nil] if the manifest could not be found or could not be parsed
       def manifest
         @manifest ||= load_manifest
       end
