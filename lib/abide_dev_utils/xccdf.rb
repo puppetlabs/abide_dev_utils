@@ -619,11 +619,12 @@ module AbideDevUtils
       end
 
       def reference
-        @reference ||= @element_type == 'control' ? @xml['idref'] : @xml['id']
+        @reference ||= @element_type.include?('control') ? @xml['idref'] : @xml['id']
       end
 
       def hiera_title(**opts)
-        send("normalize_#{@element_type}_name".to_sym, @xml, **opts)
+        e_type = @element_type.include?('control') ? 'control' : 'profile'
+        send("normalize_#{e_type}_name".to_sym, @xml, **opts)
       end
 
       private
