@@ -16,6 +16,8 @@ module AbideDevUtils
       case type.downcase
       when 'cis'
         Benchmark.new(xccdf_file).gen_map(**opts)
+      when 'stig'
+        Benchmark.new(xccdf_file).gen_map(**opts)
       else
         raise AbideDevUtils::Errors::UnsupportedXCCDFError, "XCCDF type #{type} is unsupported!"
       end
@@ -51,26 +53,31 @@ module AbideDevUtils
     module Common
       XPATHS = {
         benchmark: {
-          all: 'xccdf:Benchmark',
-          title: 'xccdf:Benchmark/xccdf:title',
-          version: 'xccdf:Benchmark/xccdf:version'
+          all: 'Benchmark',
+          title: 'Benchmark/title',
+          version: 'Benchmark/version'
         },
         cis: {
           profiles: {
-            all: 'xccdf:Benchmark/xccdf:Profile',
-            relative_title: './xccdf:title',
-            relative_select: './xccdf:select'
+            all: 'Benchmark/Profile',
+            relative_title: './title',
+            relative_select: './select'
           }
         }
       }.freeze
       CONTROL_PREFIX = /^[\d.]+_/.freeze
       UNDERSCORED = /(\s|\(|\)|-|\.)/.freeze
+      CIS_TITLE_MARKER = 'CIS'
       CIS_NEXT_GEN_WINDOWS = /[Nn]ext_[Gg]eneration_[Ww]indows_[Ss]ecurity/.freeze
       CIS_CONTROL_NUMBER = /([0-9.]+[0-9]+)/.freeze
       CIS_LEVEL_CODE = /(?:_|^)([Ll]evel_[0-9]|[Ll]1|[Ll]2|[NnBb][GgLl]|#{CIS_NEXT_GEN_WINDOWS})/.freeze
       CIS_CONTROL_PARTS = /#{CIS_CONTROL_NUMBER}#{CIS_LEVEL_CODE}?_+([A-Za-z].*)/.freeze
       CIS_PROFILE_PARTS = /#{CIS_LEVEL_CODE}[_-]+([A-Za-z].*)/.freeze
-      STIG_PROFILE_PARTS = /(STIG)/.freeze
+      STIG_TITLE_MARKER = 'Security Technical Implementation Guide'
+      STIG_CONTROL_PARTS = /(V-[0-9]+)/.freeze
+      STIG_PROFILE_PARTS = /(MAC-\d+)_([A-Za-z].+)/.freeze
+      PROFILE_PARTS = /#{CIS_PROFILE_PARTS}|#{STIG_PROFILE_PARTS}/.freeze
+      CONTROL_PARTS = /#{CIS_CONTROL_PARTS}|#{STIG_CONTROL_PARTS}/.freeze
 
       def xpath(path)
         @xml.xpath(path)
@@ -120,21 +127,40 @@ module AbideDevUtils
       end
 
       def profile_parts(profile)
-        return ['STIG', ''] if profile == 'STIG'
-
-        parts = control_profile_text(profile).match(CIS_PROFILE_PARTS)
+        parts = control_profile_text(profile).match(PROFILE_PARTS)
         raise AbideDevUtils::Errors::ProfilePartsError, profile if parts.nil?
 
-        parts[1].gsub!(/[Ll]evel_/, 'L')
-        parts[1..2]
+        if parts[1]
+          # CIS profile
+          parts[1].gsub!(/[Ll]evel_/, 'L')
+          parts[1..2]
+        elsif parts[3]
+          # STIG profile
+          parts[3..4]
+        else
+          raise AbideDevUtils::Errors::ProfilePartsError, profile
+        end
       end
 
-      def control_parts(control, parent_level: nil)
-        mdata = control_profile_text(control).match(CIS_CONTROL_PARTS)
+      def control_parts(control)
+        mdata = control_profile_text(control).match(CONTROL_PARTS)
         raise AbideDevUtils::Errors::ControlPartsError, control if mdata.nil?
 
-        mdata[2] = parent_level unless parent_level.nil?
-        mdata[1..3]
+        if mdata[1]
+          # CIS control
+          mdata[1..3]
+        elsif mdata[4]
+          # STIG control
+          vuln_id = mdata[4]
+          group = @benchmark.xpath("Group[@id='#{vuln_id}']")
+          if group.xpath('Rule').length != 1
+            raise AbideDevUtils::Errors::ControlPartsError, control
+          end
+          rule_id = group.xpath('Rule/@id').first.value
+          return [vuln_id, rule_id]
+        else
+          raise AbideDevUtils::Errors::ControlPartsError, control
+        end
       end
 
       def control_profile_text(item)
@@ -151,14 +177,6 @@ module AbideDevUtils
         end
       end
 
-      def sorted_control_classes(raw_select_list, sort_key: :number)
-        raw_select_list.map { |x| Control.new(x) }.sort_by(&sort_key)
-      end
-
-      def sorted_profile_classes(raw_profile_list, sort_key: :title)
-        raw_profile_list.map { |x| Profile.new(x) }.sort_by(&sort_key)
-      end
-
       def ==(other)
         diff_properties.map { |x| send(x) } == other.diff_properties.map { |x| other.send(x) }
       end
@@ -172,14 +190,17 @@ module AbideDevUtils
     class Benchmark
       include AbideDevUtils::XCCDF::Common
 
-      MAP_INDICES = %w[title hiera_title hiera_title_num number].freeze
+      CIS_MAP_INDICES = %w[title hiera_title hiera_title_num number].freeze
+      STIG_MAP_INDICES = %w[vulnid ruleid].freeze
 
-      attr_reader :xml, :title, :version, :diff_properties
+      attr_reader :xml, :title, :version, :diff_properties, :benchmark
 
       def initialize(path)
         @xml = parse(path)
-        @title = xpath('xccdf:Benchmark/xccdf:title').text
-        @version = xpath('xccdf:Benchmark/xccdf:version').text
+        @xml.remove_namespaces!
+        @benchmark = xpath('Benchmark')
+        @title = xpath('Benchmark/title').text
+        @version = xpath('Benchmark/version').text
         @diff_properties = %i[title version profiles]
       end
 
@@ -188,7 +209,7 @@ module AbideDevUtils
       end
 
       def profiles
-        @profiles ||= Profiles.new(xpath('xccdf:Benchmark/xccdf:Profile'))
+        @profiles ||= Profiles.new(xpath('Benchmark/Profile'), @benchmark)
       end
 
       def profile_levels
@@ -200,7 +221,7 @@ module AbideDevUtils
       end
 
       def controls
-        @controls ||= Controls.new(xpath('//xccdf:select'))
+        @controls ||= Controls.new(xpath('//select'))
       end
 
       def controls_by_profile_level(level_code)
@@ -212,15 +233,22 @@ module AbideDevUtils
       end
 
       def gen_map(dir: nil, type: 'cis', parent_key_prefix: '', version_output_dir: false, **_)
-        os, ver = facter_platform
+        case type
+        when 'cis'
+          os, ver = facter_platform
+          indicies = CIS_MAP_INDICES
+        when 'stig'
+          os, ver = facter_benchmark
+          indicies = STIG_MAP_INDICES
+        end
         output_path = [type, os, ver]
         output_path.unshift(File.expand_path(dir)) if dir
         output_path << version if version_output_dir
         mapping_dir = File.expand_path(File.join(output_path))
         parent_key_prefix = '' if parent_key_prefix.nil?
-        MAP_INDICES.each_with_object({}) do |idx, h|
+        indicies.each_with_object({}) do |idx, h|
           map_file_path = "#{mapping_dir}/#{idx}.yaml"
-          h[map_file_path] = map_indexed(index: idx, framework: type, key_prefix: parent_key_prefix)
+          h[map_file_path] = map_indexed(indicies: indicies, index: idx, framework: type, key_prefix: parent_key_prefix)
         end
       end
 
@@ -240,10 +268,10 @@ module AbideDevUtils
         }
       end
 
-      def map_indexed(index: 'title', framework: 'cis', key_prefix: '')
+      def map_indexed(indicies: [], index: 'title', framework: 'cis', key_prefix: '')
         c_map = profiles.each_with_object({}) do |profile, obj|
           obj[profile.level.downcase] = {} unless obj[profile.level.downcase].is_a?(Hash)
-          obj[profile.level.downcase][profile.title.downcase] = map_controls_hash(profile, index).sort_by { |k, _| k }.to_h
+          obj[profile.level.downcase][profile.title.downcase] = map_controls_hash(profile, indicies, index).sort_by { |k, _| k }.to_h
         end
 
         c_map['benchmark'] = { 'title' => title, 'version' => version }
@@ -252,8 +280,13 @@ module AbideDevUtils
         { mappings.join('::') => c_map }.to_yaml
       end
 
+      def facter_benchmark
+        id = xpath('Benchmark/@id').text
+        id.split('_')[0..-2]
+      end
+
       def facter_platform
-        cpe = xpath('xccdf:Benchmark/xccdf:platform')[0]['idref'].split(':')
+        cpe = xpath('Benchmark/platform')[0]['idref'].split(':')
         if cpe.length > 4
           product_name = cpe[4].split('_')
           product_version = cpe[5].split('.') unless cpe[5].nil?
@@ -283,8 +316,8 @@ module AbideDevUtils
         hash.to_yaml
       end
 
-      def resolve_control_reference(control)
-        xpath("//xccdf:Rule[@id='#{control.reference}']")
+      def resolve_cis_control_reference(control)
+        xpath("//Rule[@id='#{control.reference}']")
       end
 
       private
@@ -294,15 +327,15 @@ module AbideDevUtils
         when 'hiera_title_num'
           control.hiera_title(number_format: true)
         when 'title'
-          resolve_control_reference(control).xpath('./xccdf:title').text
+          resolve_cis_control_reference(control).xpath('./title').text
         else
           control.send(index.to_sym)
         end
       end
 
-      def map_controls_hash(profile, index)
+      def map_controls_hash(profile, indicies, index)
         profile.controls.each_with_object({}) do |ctrl, hsh|
-          control_array = MAP_INDICES.each_with_object([]) do |idx_sym, ary|
+          control_array = indicies.each_with_object([]) do |idx_sym, ary|
             next if idx_sym == index
 
             item = format_map_control_index(idx_sym, ctrl)
@@ -319,13 +352,9 @@ module AbideDevUtils
         end
       end
 
-      def sorted_profile_classes(raw_profile_list, sort_key: :level)
-        raw_profile_list.map { |x| Profile.new(x) }.sort_by(&sort_key)
-      end
-
       def find_profiles
         profs = {}
-        xpath('xccdf:Benchmark/xccdf:Profile').each do |profile|
+        xpath('Benchmark/Profile').each do |profile|
           level_code, name = profile_parts(profile['id'])
           profs[name] = {} unless profs.key?(name)
           profs[name][level_code] = profile
@@ -352,11 +381,66 @@ module AbideDevUtils
       end
     end
 
-    class ObjectContainer
+    class XccdfObject
       include AbideDevUtils::XCCDF::Common
 
-      def initialize(list, object_creation_method, *args, **kwargs)
-        @object_list = send(object_creation_method.to_sym, list, *args, **kwargs)
+      def initialize(benchmark)
+        @benchmark = benchmark
+        @benchmark_type = benchmark_type
+      end
+
+      def controls_class
+        case @benchmark_type
+        when :cis
+          CisControls
+        when :stig
+          StigControls
+        else
+          raise AbideDevUtils::Errors::UnsupportedXCCDFError
+        end
+      end
+
+      def control_sort_key
+        case @benchmark_type
+        when :cis
+          :number
+        when :stig
+          :vulnid
+        else
+          raise AbideDevUtils::Errors::UnsupportedXCCDFError
+        end
+      end
+
+      def control_class
+        case @benchmark_type
+        when :cis
+          CisControl
+        when :stig
+          StigControl
+        else
+          raise AbideDevUtils::Errors::UnsupportedXCCDFError
+        end
+      end
+
+      private
+
+      def benchmark_type
+        title = @benchmark.at_xpath('title').text
+        if title.include?(STIG_TITLE_MARKER)
+          return :stig
+        elsif title.include?(CIS_TITLE_MARKER)
+          return :cis
+        end
+        raise AbideDevUtils::Errors::UnsupportedXCCDFError, "XCCDF type is unsupported!"
+      end
+    end
+
+    class ObjectContainer < XccdfObject
+      include AbideDevUtils::XCCDF::Common
+
+      def initialize(list, object_creation_method, benchmark, *args, **kwargs)
+        super(benchmark)
+        @object_list = send(object_creation_method.to_sym, list, benchmark, *args, **kwargs)
         @searchable = []
       end
 
@@ -399,6 +483,14 @@ module AbideDevUtils
 
       private
 
+      def sorted_control_classes(raw_select_list, benchmark)
+        raw_select_list.map { |x| control_class.new(x, benchmark) }.sort_by(&control_sort_key)
+      end
+
+      def sorted_profile_classes(raw_profile_list, benchmark)
+        raw_profile_list.map { |x| Profile.new(x, benchmark) }.sort_by(&:title)
+      end
+
       def resolve_hash_key(obj)
         return obj.send(:raw_title) unless defined?(@hash_key)
 
@@ -419,8 +511,8 @@ module AbideDevUtils
     end
 
     class Profiles < ObjectContainer
-      def initialize(list)
-        super(list, :sorted_profile_classes)
+      def initialize(list, benchmark)
+        super(list, :sorted_profile_classes, benchmark)
         searchable! :level, :title
         index! :title
         hash_key! :level, :title
@@ -443,9 +535,34 @@ module AbideDevUtils
       end
     end
 
-    class Controls < ObjectContainer
-      def initialize(list)
-        super(list, :sorted_control_classes)
+    class StigControls < ObjectContainer
+      def initialize(list, benchmark)
+        super(list, :sorted_control_classes, benchmark)
+        searchable! :vulnid, :ruleid
+        index! :vulnid
+        hash_key! :vulnid
+      end
+
+      def vulnids
+        @vulnids ||= @object_list.map(&:vulnid).sort
+      end
+
+      def ruleids
+        @ruleids ||= @object_list.map(&:ruleid).sort
+      end
+
+      def include_vulnid?(item)
+        @object_list.map(&:vulnid).include?(item)
+      end
+
+      def include_ruleid?(item)
+        @object_list.map(&:ruleid).include?(item)
+      end
+    end
+
+    class CisControls < ObjectContainer
+      def initialize(list, benchmark)
+        super(list, :sorted_control_classes, benchmark)
         searchable! :level, :title, :number
         index! :number
         hash_key! :number
@@ -476,10 +593,11 @@ module AbideDevUtils
       end
     end
 
-    class XccdfElement
+    class XccdfElement < XccdfObject
       include AbideDevUtils::XCCDF::Common
 
-      def initialize(element)
+      def initialize(element, benchmark)
+        super(benchmark)
         @xml = element
         @element_type = self.class.name.split('::').last.downcase
         @raw_title = control_profile_text(element)
@@ -527,19 +645,27 @@ module AbideDevUtils
     end
 
     class Profile < XccdfElement
-      def initialize(profile)
-        super(profile)
+      def initialize(profile, benchmark)
+        super(profile, benchmark)
         @level, @title = profile_parts(control_profile_text(profile))
-        @plain_text_title = @xml.xpath('./xccdf:title').text
-        @controls = Controls.new(xpath('./xccdf:select'))
+        @plain_text_title = @xml.xpath('./title').text
+        @controls = controls_class.new(xpath('./select'), benchmark)
         properties :title, :level, :plain_text_title, controls: :to_h
       end
     end
 
-    class Control < XccdfElement
-      def initialize(control, parent_level: nil)
-        super(control)
-        @number, @level, @title = control_parts(control_profile_text(control), parent_level: parent_level)
+    class StigControl < XccdfElement
+      def initialize(control, benchmark)
+        super(control, benchmark)
+        @vulnid, @ruleid = control_parts(control_profile_text(control))
+        properties :vulnid, :ruleid
+      end
+    end
+
+    class CisControl < XccdfElement
+      def initialize(control, benchmark)
+        super(control, benchmark)
+        @number, @level, @title = control_parts(control_profile_text(control))
         properties :number, :level, :title
       end
     end
