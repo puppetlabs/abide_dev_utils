@@ -157,7 +157,8 @@ module AbideDevUtils
             raise AbideDevUtils::Errors::ControlPartsError, control
           end
           rule_id = group.xpath('Rule/@id').first.value
-          return [vuln_id, rule_id]
+          title = group.xpath('Rule/title').text
+          return [vuln_id, rule_id, title]
         else
           raise AbideDevUtils::Errors::ControlPartsError, control
         end
@@ -658,8 +659,8 @@ module AbideDevUtils
     class StigControl < XccdfElement
       def initialize(control, benchmark)
         super(control, benchmark)
-        @vulnid, @ruleid = control_parts(control_profile_text(control))
-        properties :vulnid, :ruleid
+        @vulnid, @ruleid, @title = control_parts(control_profile_text(control))
+        properties :vulnid, :ruleid, :title
       end
     end
 
