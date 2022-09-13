@@ -22,6 +22,7 @@ module Abide
         add_command(JiraGetIssueCommand.new)
         add_command(JiraNewIssueCommand.new)
         add_command(JiraFromCoverageCommand.new)
+        add_command(JiraFromXccdfCommand.new)
       end
     end
 
@@ -111,6 +112,27 @@ module Abide
         File.open(report) do |f|
           JIRA.new_issues_from_coverage(client, proj, JSON.parse(f.read), dry_run: @data[:dry_run])
         end
+      end
+    end
+
+    class JiraFromXccdfCommand < CmdParse::Command
+      CMD_NAME = 'from_xccdf'
+      CMD_SHORT = 'Creates a parent issue with subtasks from a xccdf file'
+      CMD_LONG = 'Creates a parent issue with subtasks for a benchmark and any uncovered controls'
+      def initialize
+        super(CMD_NAME, takes_commands: false)
+        short_desc(CMD_SHORT)
+        long_desc(CMD_LONG)
+        argument_desc(PATH: 'An XCCDF file from the abide puppet ticket coverage command', PROJECT: 'A Jira project')
+        options.on('-d', '--dry-run', 'Print to console instead of saving objects') { |_| @data[:dry_run] = true }
+      end
+
+      def execute(path, project)
+        Abide::CLI::VALIDATE.file(path)
+        @data[:dry_run] = false if @data[:dry_run].nil?
+        client = JIRA.client(options: {})
+        proj = JIRA.project(client, project)
+        JIRA.new_issues_from_xccdf(client, proj, path, dry_run: @data[:dry_run])
       end
     end
   end

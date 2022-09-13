@@ -135,6 +135,33 @@ module AbideDevUtils
       end
     end
 
+    def self.new_issues_from_xccdf(client, project, xccdf_path, dry_run: false)
+      dr_prefix = dry_run ? 'DRY RUN: ' : ''
+      i_attrs = all_project_issues_attrs(project)
+
+      xccdf = AbideDevUtils::XCCDF::Benchmark.new(xccdf_path)
+
+      summaries = summaries_from_xccdf(xccdf)
+      summaries.each do |profile_summary, control_summaries|
+        next if summary_exist?(profile_summary, i_attrs)
+
+        parent = new_issue(client, project.attrs['key'], profile_summary, dry_run: dry_run)
+        AbideDevUtils::Output.simple("#{dr_prefix}Created parent issue #{profile_summary}")
+        parent_issue = issue(client, parent.attrs['key']) unless parent.respond_to?(:dummy)
+        AbideDevUtils::Output.simple("#{dr_prefix}Creating subtasks, this can take a while...")
+        progress = AbideDevUtils::Output.progress(title: "#{dr_prefix}Creating Subtasks", total: nil)
+        control_summaries.each do |control_summary|
+          next if summary_exist?(control_summary, i_attrs)
+
+          progress.title = "#{dr_prefix}#{control_summary}"
+          new_subtask(client, parent_issue, control_summary, dry_run: dry_run)
+          progress.increment
+        end
+        final_text = "#{dr_prefix}Created #{control_summaries.count} subtasks for #{profile_summary}"
+        puts "\r\033[K#{final_text}\n"
+      end
+    end
+
     # def self.new_issues_from_comply_report(client, project, report, dry_run: false)
     #   dr_prefix = dry_run ? 'DRY RUN: ' : ''
     #   i_attrs = all_project_issues_attrs(project)
@@ -175,6 +202,17 @@ module AbideDevUtils
         end
       end
       summaries.transform_keys { |k| "#{COV_PARENT_SUMMARY_PREFIX}#{benchmark}-#{k}"}
+    end
+
+    def self.summaries_from_xccdf(xccdf)
+      summaries = {}
+      facter_os = xccdf.facter_benchmark.join('-')
+      xccdf.profiles.each do |profile|
+        summaries["#{COV_PARENT_SUMMARY_PREFIX}#{facter_os} - #{profile.level} #{profile.title}"] = profile.controls.collect do |control|
+          "#{COV_CHILD_SUMMARY_PREFIX}#{control.vulnid} - #{control.title}"
+        end
+      end
+      summaries
     end
 
     # def self.summaries_from_comply_report(report)
