@@ -143,7 +143,10 @@ module AbideDevUtils
 
       summaries = summaries_from_xccdf(xccdf)
       summaries.each do |profile_summary, control_summaries|
-        next if summary_exist?(profile_summary, i_attrs)
+        if summary_exist?(profile_summary, i_attrs)
+          AbideDevUtils::Output.simple("#{dr_prefix}Skipping #{profile_summary} as it already exists")
+          next
+        end
 
         parent = new_issue(client, project.attrs['key'], profile_summary, dry_run: dry_run)
         AbideDevUtils::Output.simple("#{dr_prefix}Created parent issue #{profile_summary}")
@@ -209,7 +212,11 @@ module AbideDevUtils
       facter_os = xccdf.facter_benchmark.join('-')
       xccdf.profiles.each do |profile|
         summaries["#{COV_PARENT_SUMMARY_PREFIX}#{facter_os} - #{profile.level} #{profile.title}"] = profile.controls.collect do |control|
-          "#{COV_CHILD_SUMMARY_PREFIX}#{control.vulnid} - #{control.title}"
+          summary = "#{COV_CHILD_SUMMARY_PREFIX}#{control.vulnid} - #{control.title}"
+          if summary.length > 255
+            summary = summary[0..251] + '...'
+          end
+          summary
         end
       end
       summaries
