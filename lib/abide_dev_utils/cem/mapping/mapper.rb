@@ -6,13 +6,13 @@ require 'abide_dev_utils/cem/hiera_data/mapping_data/mixins'
 module AbideDevUtils
   module CEM
     module Mapping
-      ALL_TYPES = %w[hiera_title_num number hiera_title vulnid title].freeze
+      ALL_TYPES = %w[hiera_title_num number hiera_title title vulnid ruleid].freeze
       FRAMEWORK_TYPES = {
         'cis' => %w[hiera_title_num number hiera_title title],
-        'stig' => %w[hiera_title_num number hiera_title vulnid title],
+        'stig' => %w[vulnid ruleid],
       }.freeze
       CIS_TYPES = %w[hiera_title_num number hiera_title title].freeze
-      STIG_TYPES = %w[hiera_title_num number hiera_title vulnid title].freeze
+      STIG_TYPES = %w[vulnid ruleid].freeze
 
       # Represents a single map data file
       class MapData
@@ -168,6 +168,8 @@ module AbideDevUtils
             'hiera_title'
           when %r{^V-[0-9]{6}$}
             'vulnid'
+          when %r{^SV-[0-9]+r[0-9]+_rule$}
+            'ruleid'
           else
             'title'
           end

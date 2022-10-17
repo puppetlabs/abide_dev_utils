@@ -120,7 +120,11 @@ module AbideDevUtils
           private
 
           def heading_builder
-            @md.add_h2("#{@control.number} - #{@control.title}")
+            if @framework == 'stig'
+              @md.add_h2(@control.id)
+            else
+              @md.add_h2("#{@control.number} - #{@control.title}")
+            end
           end
 
           def control_has_valid_params?
@@ -216,12 +220,13 @@ module AbideDevUtils
             end
             return if out_str.empty?
 
-            out_str.unshift("    #{@control.title.dump}:")
+            @control.title.nil? ? out_str.unshift("    #{@control.id.dump}:") : out_str.unshift("    #{@control.title.dump}:")
             out_str.unshift('  control_configs:')
             out_str.unshift("#{@module_name}::config:")
             @md.add_ul('Hiera Configuration Example:')
             @md.add_code_block(out_str.join("\n"), language: 'yaml')
           rescue StandardError => e
+            require 'pry'; binding.pry
             err_msg = [
               "Failed to generate config example for control #{@control.id}",
               "Error: #{e.message}",
