@@ -41,8 +41,8 @@ module AbideDevUtils
       FWRITER.write_yml(yml_out, file: file) unless file.nil?
     end
 
-    def self.progress(title: 'Progress', start: 0, total: 100)
-      ProgressBar.create(title: title, starting_at: start, total: total)
+    def self.progress(title: 'Progress', start: 0, total: 100, format: nil)
+      ProgressBar.create(title: title, starting_at: start, total: total, format: format)
     end
   end
 end

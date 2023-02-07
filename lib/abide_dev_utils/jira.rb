@@ -11,6 +11,7 @@ module AbideDevUtils
     ERRORS = AbideDevUtils::Errors::Jira
     COV_PARENT_SUMMARY_PREFIX = '::BENCHMARK:: '
     COV_CHILD_SUMMARY_PREFIX = '::CONTROL:: '
+    PROGRESS_BAR_FORMAT = '%a %e %P% Created: %c of %C'
 
     def self.project(client, project)
       client.Project.find(project)
@@ -18,6 +19,11 @@ module AbideDevUtils
 
     def self.issue(client, issue)
       client.Issue.find(issue)
+    rescue URI::InvalidURIError
+      iss = client.Issue.all.find { |i| i.summary == issue }
+      raise ERRORS::FindIssueError, issue unless iss
+
+      iss
     end
 
     def self.myself(client)
@@ -25,11 +31,19 @@ module AbideDevUtils
     end
 
     def self.issuetype(client, id)
-      client.Issuetype.find(id)
+      if id.match?(%r{^\d+$})
+        client.Issuetype.find(id)
+      else
+        client.Issuetype.all.find { |i| i.name == id }
+      end
     end
 
     def self.priority(client, id)
-      client.Priority.find(id)
+      if id.match?(%r{^\d+$})
+        client.Priority.find(id)
+      else
+        client.Priority.all.find { |i| i.name == id }
+      end
     end
 
     def self.all_project_issues_attrs(project)
@@ -37,21 +51,50 @@ module AbideDevUtils
       raw_issues.collect(&:attrs)
     end
 
-    def self.new_issue(client, project, summary, dry_run: false)
+    def self.add_issue_label(iss, label, dry_run: false)
+      return if dry_run || iss.labels.include?(label)
+
+      iss.labels << profile_summary
+      iss.save
+    end
+
+    def self.new_issue(client, project, summary, labels: ['abide_dev_utils'], epic: nil, dry_run: false)
       if dry_run
         sleep(0.2)
-        return Dummy.new
+        return Dummy.new(summary)
       end
       fields = {}
       fields['summary'] = summary
       fields['project'] = project(client, project)
       fields['reporter'] = myself(client)
-      fields['issuetype'] = issuetype(client, '3')
+      fields['issuetype'] = issuetype(client, 'Task')
       fields['priority'] = priority(client, '6')
-      issue = client.Issue.build
-      raise ERRORS::CreateIssueError, issue.attrs unless issue.save({ 'fields' => fields })
+      fields['labels'] = labels
+      epic = issue(client, epic) if epic && !epic.is_a?(JIRA::Resource::Issue)
+      fields['customfield_10006'] = epic.key if epic # Epic_Link
+      iss = client.Issue.build
+      raise ERRORS::CreateIssueError, iss.attrs unless iss.save({ 'fields' => fields })
 
-      issue
+      iss
+    end
+
+    def self.new_epic(client, project, summary, dry_run: false)
+      AbideDevUtils::Output.simple("#{dr_prefix(dry_run)}Creating epic '#{summary}'")
+      if dry_run
+        sleep(0.2)
+        return Dummy.new(summary)
+      end
+      fields = {
+        'summary' => summary,
+        'project' => project(client, project),
+        'reporter' => myself(client),
+        'issuetype' => issuetype(client, 'Epic'),
+        'customfield_10007' => summary, # Epic Name
+      }
+      iss = client.Issue.build
+      raise ERRORS::CreateEpicError, iss.attrs unless iss.save({ 'fields' => fields })
+
+      iss
     end
 
     # This should probably be threaded in the future
@@ -135,45 +178,54 @@ module AbideDevUtils
       end
     end
 
-    def self.new_issues_from_xccdf(client, project, xccdf_path, dry_run: false)
-      dr_prefix = dry_run ? 'DRY RUN: ' : ''
+    def self.new_issues_from_xccdf(client, project, xccdf_path, epic: nil, dry_run: false)
       i_attrs = all_project_issues_attrs(project)
-
       xccdf = AbideDevUtils::XCCDF::Benchmark.new(xccdf_path)
-
-      summaries = summaries_from_xccdf(xccdf)
-      summaries.each do |profile_summary, control_summaries|
-        if summary_exist?(profile_summary, i_attrs)
-          AbideDevUtils::Output.simple("#{dr_prefix}Skipping #{profile_summary} as it already exists")
-          next
+      # We need to get the actual epic Issue object, or create it if it doesn't exist
+      epic = if epic.nil?
+               new_epic_summary = "#{COV_PARENT_SUMMARY_PREFIX}#{xccdf.title}"
+               if summary_exist?(new_epic_summary, i_attrs)
+                 issue(client, new_epic_summary)
+               else
+                 unless AbideDevUtils::Prompt.yes_no("#{dr_prefix(dry_run)}Create new epic '#{new_epic_summary}'?")
+                   AbideDevUtils::Output.simple("#{dr_prefix(dry_run)}Aborting")
+                   exit(0)
+                 end
+                 new_epic(client, project.key, new_epic_summary, dry_run: dry_run)
+               end
+             else
+               issue(client, epic)
+             end
+      # Now we need to find out which issues we need to create for the benchmark
+      # The profiles that the control belongs to will be added as an issue label
+      to_create = {}
+      summaries_from_xccdf(xccdf).each do |profile_summary, control_summaries|
+        control_summaries.reject { |s| summary_exist?(s, i_attrs) }.each do |control_summary|
+          if to_create.key?(control_summary)
+            to_create[control_summary] << profile_summary.split.join('_').downcase
+          else
+            to_create[control_summary] = [profile_summary.split.join('_').downcase]
+          end
         end
-
-        parent = new_issue(client, project.attrs['key'], profile_summary, dry_run: dry_run)
-        AbideDevUtils::Output.simple("#{dr_prefix}Created parent issue #{profile_summary}")
-        parent_issue = issue(client, parent.attrs['key']) unless parent.respond_to?(:dummy)
-        AbideDevUtils::Output.simple("#{dr_prefix}Creating subtasks, this can take a while...")
-        progress = AbideDevUtils::Output.progress(title: "#{dr_prefix}Creating Subtasks", total: nil)
-        control_summaries.each do |control_summary|
-          next if summary_exist?(control_summary, i_attrs)
-
-          progress.title = "#{dr_prefix}#{control_summary}"
-          new_subtask(client, parent_issue, control_summary, dry_run: dry_run)
-          progress.increment
-        end
-        final_text = "#{dr_prefix}Created #{control_summaries.count} subtasks for #{profile_summary}"
-        puts "\r\033[K#{final_text}\n"
       end
+
+      unless AbideDevUtils::Prompt.yes_no("#{dr_prefix(dry_run)}Create #{to_create.keys.count} new Jira issues?")
+        AbideDevUtils::Output.simple("#{dr_prefix(dry_run)}Aborting")
+        exit(0)
+      end
+
+      progress = AbideDevUtils::Output.progress(title: "#{dr_prefix(dry_run)}Creating issues",
+                                                total: to_create.keys.count,
+                                                format: PROGRESS_BAR_FORMAT)
+      to_create.each do |control_summary, labels|
+        abrev = control_summary.length > 40 ? control_summary[0..60] : control_summary
+        progress.log("#{dr_prefix(dry_run)}Creating #{abrev}...")
+        new_issue(client, project.key, control_summary, labels: labels, epic: epic, dry_run: dry_run)
+        progress.increment
+      end
+      progress.finish
+      AbideDevUtils::Output.simple("#{dr_prefix(dry_run)}Done creating tasks in Epic '#{epic.summary}'")
     end
-
-    # def self.new_issues_from_comply_report(client, project, report, dry_run: false)
-    #   dr_prefix = dry_run ? 'DRY RUN: ' : ''
-    #   i_attrs = all_project_issues_attrs(project)
-    #   rep_sums = summaries_from_coverage_report(report)
-    #   rep_sums.each do |k, v|
-    #     next if summary_exist?(k, i_attrs)
-
-    #     progress = AbideDevUtils::Output.progress(title: "#{dr_prefix}Creating Tasks", total: nil)
-    #     v.each do |s|
 
     def self.merge_options(options)
       config.merge(options)
@@ -209,25 +261,30 @@ module AbideDevUtils
 
     def self.summaries_from_xccdf(xccdf)
       summaries = {}
-      facter_os = xccdf.facter_benchmark.join('-')
       xccdf.profiles.each do |profile|
-        summaries["#{COV_PARENT_SUMMARY_PREFIX}#{facter_os} - #{profile.level} #{profile.title}"] = profile.controls.collect do |control|
-          summary = "#{COV_CHILD_SUMMARY_PREFIX}#{control.vulnid} - #{control.title}"
-          if summary.length > 255
-            summary = summary[0..251] + '...'
-          end
+        sum_key = "#{profile.level}_#{profile.title}".split.join('_').downcase
+        summaries[sum_key] = profile.controls.collect do |control|
+          control_id = control.respond_to?(:vulnid) ? control.vulnid : control.number
+          summary = "#{control_id} - #{control.title}"
+          summary = "#{summary[0..251]}..." if summary.length > 255
           summary
         end
       end
       summaries
     end
 
-    # def self.summaries_from_comply_report(report)
-    #   summaries = {}
-    #   report.each do |_, v|
-    # end
+    def self.dr_prefix(dry_run)
+      dry_run ? 'DRY RUN: ' : ''
+    end
 
     class Dummy
+      attr_reader :summary, :key
+
+      def initialize(summary = 'dummy summary')
+        @summary = summary
+        @key = 'DUM-111'
+      end
+
       def attrs
         { 'fields' => {
           'project' => 'dummy',

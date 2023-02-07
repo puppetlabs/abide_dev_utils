@@ -123,8 +123,9 @@ module Abide
         super(CMD_NAME, takes_commands: false)
         short_desc(CMD_SHORT)
         long_desc(CMD_LONG)
-        argument_desc(PATH: 'An XCCDF file from the abide puppet ticket coverage command', PROJECT: 'A Jira project')
+        argument_desc(PATH: 'An XCCDF file', PROJECT: 'A Jira project')
         options.on('-d', '--dry-run', 'Print to console instead of saving objects') { |_| @data[:dry_run] = true }
+        options.on('-e [EPIC]', '--epic [EPIC]', 'If given, tasks will be created and assigned to this epic. Takes form <PROJECT>-<NUM>') { |e| @data[:epic] = e }
       end
 
       def execute(path, project)
@@ -132,7 +133,7 @@ module Abide
         @data[:dry_run] = false if @data[:dry_run].nil?
         client = JIRA.client(options: {})
         proj = JIRA.project(client, project)
-        JIRA.new_issues_from_xccdf(client, proj, path, dry_run: @data[:dry_run])
+        JIRA.new_issues_from_xccdf(client, proj, path, epic: @data[:epic], dry_run: @data[:dry_run])
       end
     end
   end
