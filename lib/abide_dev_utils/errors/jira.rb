@@ -9,6 +9,10 @@ module AbideDevUtils
         @default = 'Failed to create Jira issue:'
       end
 
+      class CreateEpicError < GenericError
+        @default = 'Failed to create Jira epic:'
+      end
+
       class CreateSubtaskError < GenericError
         @default = 'Failed to create Jira subtask for issue:'
       end
