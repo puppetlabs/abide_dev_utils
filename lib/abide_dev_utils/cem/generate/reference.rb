@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require 'json'
+require 'puppet-strings'
+require 'puppet-strings/yard'
 require 'shellwords'
 require 'timeout'
 require 'yaml'
@@ -31,7 +33,7 @@ module AbideDevUtils
           case data.fetch(:format, 'markdown')
           when 'markdown'
             file = data[:out_file] || 'REFERENCE.md'
-            MarkdownGenerator.new(benchmarks, pupmod.name, file: file).generate(doc_title)
+            MarkdownGenerator.new(benchmarks, pupmod.name, file: file, opts: data).generate(doc_title)
           else
             raise "Format #{data[:format]} is unsupported! Only `markdown` format supported"
           end
@@ -61,31 +63,35 @@ module AbideDevUtils
         class MarkdownGenerator
           SPECIAL_CONTROL_IDS = %w[dependent cem_options cem_protected].freeze
 
-          def initialize(benchmarks, module_name, file: 'REFERENCE.md')
+          def initialize(benchmarks, module_name, file: 'REFERENCE.md', opts: {})
             @benchmarks = benchmarks
             @module_name = module_name
             @file = file
+            @opts = opts
             @md = AbideDevUtils::Markdown.new(@file)
           end
 
           def generate(doc_title = 'Reference')
+            @strings = Strings.new(opts: @opts)
             md.add_title(doc_title)
             benchmarks.each do |benchmark|
-              progress_bar = AbideDevUtils::Output.progress(title: "Generating Markdown for #{benchmark.title_key}",
-                                                            total: benchmark.controls.length)
+              unless @opts[:quiet]
+                progress_bar = AbideDevUtils::Output.progress(title: "Generating Markdown for #{benchmark.title_key}",
+                                                              total: benchmark.controls.length)
+              end
               md.add_h1(benchmark.title_key)
               benchmark.controls.each do |control|
                 next if SPECIAL_CONTROL_IDS.include? control.id
                 next if benchmark.framework == 'stig' && control.id_map_type != 'vulnid'
 
-                control_md = ControlMarkdown.new(control, @md, @module_name, benchmark.framework)
+                control_md = ControlMarkdown.new(control, @md, @strings, @module_name, benchmark.framework, opts: @opts)
                 control_md.generate!
-                progress_bar.increment
+                progress_bar.increment unless @opts[:quiet]
               rescue StandardError => e
                 raise "Failed to generate markdown for control #{control.id}. Original message: #{e.message}"
               end
             end
-            AbideDevUtils::Output.simple("Saving markdown to #{@file}")
+            AbideDevUtils::Output.simple("Saving markdown to #{@file}") unless @opts[:quiet]
             md.to_file
           end
 
@@ -96,13 +102,152 @@ module AbideDevUtils
 
         class ConfigExampleError < StandardError; end
 
+        # Puppet Strings reference object
+        class Strings
+          REGISTRY_TYPES = %i[
+            root
+            module
+            class
+            puppet_class
+            puppet_data_type
+            puppet_data_type_alias
+            puppet_defined_type
+            puppet_type
+            puppet_provider
+            puppet_function
+            puppet_task
+            puppet_plan
+          ].freeze
+
+          attr_reader :search_patterns
+
+          def initialize(search_patterns: nil, opts: {})
+            @search_patterns = search_patterns || PuppetStrings::DEFAULT_SEARCH_PATTERNS
+            @debug = opts[:debug]
+            @quiet = opts[:quiet]
+            PuppetStrings::Yard.setup!
+            YARD::CLI::Yardoc.run(*yard_args(@search_patterns, debug: @debug, quiet: @quiet))
+          end
+
+          def debug?
+            !!@debug
+          end
+
+          def quiet?
+            !!@quiet
+          end
+
+          def registry
+            @registry ||= YARD::Registry.all(*REGISTRY_TYPES)
+          end
+
+          def find_resource(resource_name)
+            to_h.each do |_, resources|
+              res = resources.find { |r| r[:name] == resource_name.to_sym }
+              return res if res
+            end
+          end
+
+          def puppet_classes
+            @puppet_classes ||= hashes_for_reg_type(:puppet_class)
+          end
+
+          def data_types
+            @data_types ||= hashes_for_reg_type(:puppet_data_types)
+          end
+
+          def data_type_aliases
+            @data_type_aliases ||= hashes_for_reg_type(:puppet_data_type_alias)
+          end
+
+          def defined_types
+            @defined_types ||= hashes_for_reg_type(:puppet_defined_type)
+          end
+
+          def resource_types
+            @resource_types ||= hashes_for_reg_type(:puppet_type)
+          end
+
+          def providers
+            @providers ||= hashes_for_reg_type(:puppet_provider)
+          end
+
+          def puppet_functions
+            @puppet_functions ||= hashes_for_reg_type(:puppet_function)
+          end
+
+          def puppet_tasks
+            @puppet_tasks ||= hashes_for_reg_type(:puppet_task)
+          end
+
+          def puppet_plans
+            @puppet_plans ||= hashes_for_reg_type(:puppet_plan)
+          end
+
+          def to_h
+            {
+              puppet_classes: puppet_classes,
+              data_types: data_types,
+              data_type_aliases: data_type_aliases,
+              defined_types: defined_types,
+              resource_types: resource_types,
+              providers: providers,
+              puppet_functions: puppet_functions,
+              puppet_tasks: puppet_tasks,
+              puppet_plans: puppet_plans,
+            }
+          end
+
+          private
+
+          def hashes_for_reg_type(reg_type)
+            all_to_h(registry.select { |i| i.type == reg_type })
+          end
+
+          def all_to_h(objects)
+            objects.sort_by(&:name).map(&:to_hash)
+          end
+
+          def yard_args(patterns, debug: false, quiet: false)
+            args = ['doc', '--no-progress', '-n']
+            args << '--debug' if debug && !quiet
+            args << '--backtrace' if debug && !quiet
+            args << '-q' if quiet
+            args << '--no-stats' if quiet
+            args += patterns
+            args
+          end
+        end
+
+        # Generates markdown for Puppet classes based on Puppet Strings JSON
+        # class PuppetClassMarkdown
+        #   def initialize(puppet_classes, md, opts: {})
+        #     @puppet_classes = puppet_classes
+        #     @md = md
+        #     @opts = opts
+        #   end
+
+        #   def generate!
+        #     @puppet_classes.each do |puppet_class|
+        #       @md.add_h2(puppet_class['name'])
+        #       @md.add_paragraph("File(Line): `#{puppet_class['file']}(#{puppet_class['line']})`")
+
+        #   private
+
+        #   def doc_string_builder(puppet_class)
+        #     return if puppet_class['docstring'].nil? || puppet_class['docstring'].empty?
+        # end
+
+        # Generates markdown for a control
         class ControlMarkdown
-          def initialize(control, md, module_name, framework, formatter: nil)
+          def initialize(control, md, strings, module_name, framework, formatter: nil, opts: {})
             @control = control
             @md = md
+            @strings = strings
             @module_name = module_name
             @framework = framework
             @formatter = formatter.nil? ? TypeExprValueFormatter : formatter
+            @opts = opts
             @control_data = {}
           end
 
@@ -156,6 +301,27 @@ module AbideDevUtils
             " - #{@md.italic('Default:')} #{@md.code(@control_data[ctrl_param[:name]][:default])}"
           end
 
+          def param_description(ctrl_param)
+            res = if @control.resource.type == 'class'
+                    @strings.find_resource(@control.resource.title)
+                  else
+                    @strings.find_resource(@control.resource.type)
+                  end
+            return unless res&.key?(:docstring) && res[:docstring].key?(:tags)
+            return if res[:docstring][:tags].empty? || res[:docstring][:tags].none? { |x| x[:tag_name] == 'param' }
+
+            param_tag = res[:docstring][:tags].find { |x| x[:tag_name] == 'param' && x[:name] == ctrl_param[:name] }
+            if param_tag.nil? || param_tag[:text].nil? || param_tag[:text].chomp.empty?
+              if @opts[:strict]
+                raise "No description found for parameter #{ctrl_param[:name]} in resource #{@control.resource.title}"
+              end
+
+              return
+            end
+
+            " - #{param_tag[:text]}"
+          end
+
           def control_params_builder
             return unless control_has_valid_params?
 
@@ -164,6 +330,8 @@ module AbideDevUtils
               collection.each do |hsh|
                 rparam = resource_param(hsh)
                 str_array = [@md.code(hsh[:name]), param_type_expr(hsh, rparam), param_default_value(hsh, rparam)]
+                desc = param_description(hsh)
+                str_array << desc if desc
                 @md.add_ul(str_array.compact.join, indent: 1)
               end
             end

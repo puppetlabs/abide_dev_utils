@@ -10,7 +10,7 @@ module AbideDevUtils
     module Hiera
       INTERP_PATTERN = /%{([^{}]+)}/.freeze
       FACT_PATTERN = /%{facts\.([^{}]+)}/.freeze
-      DEFAULT_FACTER_VERSION = '3.14'
+      DEFAULT_FACTER_VERSION = '4.2'
       DEFAULT_CONFIG_FILE = 'hiera.yaml'
 
       def self.facter_version=(version)
@@ -18,7 +18,7 @@ module AbideDevUtils
       end
 
       def self.facter_version
-        @facter_version
+        @facter_version ||= AbideDevUtils::Ppt::FacterUtils.latest_version
       end
 
       def self.default_datadir=(dir)
@@ -41,7 +41,7 @@ module AbideDevUtils
           @root_dir = File.dirname(@path)
           @conf = YAML.load_file(File.expand_path(path))
           @by_name_path_store = {}
-          AbideDevUtils::Ppt::Hiera.facter_version = facter_version
+          #AbideDevUtils::Ppt::Hiera.facter_version = facter_version
           if @conf['defaults'].key?('datadir')
             AbideDevUtils::Ppt::Hiera.default_datadir = File.join(@root_dir, @conf['defaults']['datadir'])
           end
@@ -166,6 +166,7 @@ module AbideDevUtils
 
         def initialize(path)
           @path = path
+          @fact_sets = AbideDevUtils::Ppt::FacterUtils::FactSets.new
         end
 
         def path_parts
@@ -189,7 +190,7 @@ module AbideDevUtils
         end
 
         def possible_fact_values
-          @possible_fact_values ||= AbideDevUtils::Ppt::FacterUtils.resolve_related_dot_paths(*facts)
+          @possible_fact_values ||= @fact_sets.resolve_related_dot_paths(*facts)
         end
 
         def local_files

@@ -1,15 +1,15 @@
 # frozen_string_literal: true
 
-require 'abide_dev_utils/output'
-require 'abide_dev_utils/validate'
-require 'abide_dev_utils/errors'
-require 'abide_dev_utils/ppt/api'
-require 'abide_dev_utils/ppt/code_gen'
-require 'abide_dev_utils/ppt/code_introspection'
-require 'abide_dev_utils/ppt/class_utils'
-require 'abide_dev_utils/ppt/facter_utils'
-require 'abide_dev_utils/ppt/hiera'
-require 'abide_dev_utils/ppt/puppet_module'
+require_relative 'output'
+require_relative 'validate'
+require_relative 'errors'
+require_relative 'ppt/api'
+require_relative 'ppt/code_gen'
+require_relative 'ppt/code_introspection'
+require_relative 'ppt/class_utils'
+require_relative 'ppt/facter_utils'
+require_relative 'ppt/hiera'
+require_relative 'ppt/puppet_module'
 
 module AbideDevUtils
   module Ppt
