@@ -456,7 +456,7 @@ module AbideDevUtils
 
           def new_implementation_groups(element)
             igroup = find_element.at_xpath(element, 'implementation_groups')
-            return if igroup.nil? || igroup.empty?
+            return if igroup.nil? || igroup.attributes.empty?
 
             add_child(ShortText, igroup['ig1']) if igroup['ig1']
             add_child(ShortText, igroup['ig2']) if igroup['ig2']
