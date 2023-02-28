@@ -2,6 +2,7 @@
 
 require 'abide_dev_utils/xccdf'
 require 'abide_dev_utils/cem/generate'
+require 'abide_dev_utils/cem/validate'
 
 module AbideDevUtils
   # Methods for working with Compliance Enforcement Modules (CEM)

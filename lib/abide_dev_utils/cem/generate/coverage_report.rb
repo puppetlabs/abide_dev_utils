@@ -15,14 +15,12 @@ module AbideDevUtils
       # the various compliance frameworks expect to be enforced.
       module CoverageReport
         def self.generate(format_func: :to_h, opts: {})
-          opts = AbideDevUtils::CEM::CoverageReport::ReportOptions.new(opts)
+          opts = ReportOptions.new(opts)
           pupmod = AbideDevUtils::Ppt::PuppetModule.new
           benchmarks = AbideDevUtils::CEM::Benchmark.benchmarks_from_puppet_module(pupmod,
-                                                                                  ignore_all_errors: opts.ignore_all_errors)
+                                                                                   ignore_all_errors: opts.ignore_all_errors)
           benchmarks.map do |b|
-            AbideDevUtils::CEM::CoverageReport::BenchmarkReport.new(b)
-                                                              .send(report_type, **{ profile: profile, level: level })
-                                                              .send(format_func)
+            BenchmarkReport.new(b, opts).run.send(format_func)
           end
         end
 
@@ -306,9 +304,13 @@ module AbideDevUtils
 
         # Creates ReportOutput objects based on the given Benchmark
         class BenchmarkReport
-          def initialize(benchmark, opts = AbideDevUtils::CEM::CoverageReport::ReportOptions.new)
+          def initialize(benchmark, opts = ReportOptions.new)
             @benchmark = benchmark
             @opts = opts
+          end
+
+          def run
+            send(@opts.report_type)
           end
 
           def controls_in_resource_data
@@ -322,7 +324,7 @@ module AbideDevUtils
           def basic_coverage(level: @opts.level, profile: @opts.profile)
             map_type = @benchmark.map_type(controls_in_resource_data[0])
             rules_in_map = @benchmark.rules_in_map(map_type, level: level, profile: profile)
-            AbideDevUtils::CEM::CoverageReport::ReportOutput.new(@benchmark, controls_in_resource_data, rules_in_map)
+            ReportOutput.new(@benchmark, controls_in_resource_data, rules_in_map)
           end
 
           # def correlated_coverage(level: @opts.level, profile: @opts.profile)

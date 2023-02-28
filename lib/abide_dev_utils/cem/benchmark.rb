@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
 require 'set'
-require 'abide_dev_utils/dot_number_comparable'
-require 'abide_dev_utils/errors'
-require 'abide_dev_utils/ppt'
-require 'abide_dev_utils/cem/mapping/mapper'
+require_relative '../dot_number_comparable'
+require_relative '../errors'
+require_relative '../ppt'
+require_relative 'mapping/mapper'
 
 module AbideDevUtils
   module CEM
@@ -317,7 +317,8 @@ module AbideDevUtils
       def initialize(osname, major_version, hiera_conf, module_name, framework: 'cis')
         @osname = osname
         @major_version = major_version
-        @os_facts = AbideDevUtils::Ppt::FacterUtils.recursive_facts_for_os(@osname, @major_version)
+        @os_facts = AbideDevUtils::Ppt::FacterUtils::FactSets.new.find_by_fact_value_tuples(['os.name', @osname],
+                                                                                            ['os.release.major', @major_version])
         @osfamily = @os_facts['os']['family']
         @hiera_conf = hiera_conf
         @module_name = module_name
@@ -484,6 +485,8 @@ module AbideDevUtils
         raise AbideDevUtils::Errors::ResourceDataNotFoundError, facts if rdata_files.nil? || rdata_files.empty?
 
         YAML.load_file(rdata_files[0].path)
+      rescue StandardError => e
+        require 'pry'; binding.pry
       end
     end
   end

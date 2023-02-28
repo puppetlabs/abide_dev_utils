@@ -17,6 +17,7 @@ module Abide
         super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: true)
         add_command(CemGenerate.new)
         add_command(CemUpdateConfig.new)
+        add_command(CemValidate.new)
       end
     end
 
@@ -69,11 +70,11 @@ module Abide
         quiet = @data.fetch(:quiet, false)
         console = @data.fetch(:verbose, false) && !quiet
         generate_opts = {
-          benchmark: @data.fetch(:benchmark),
-          profile: @data.fetch(:profile),
-          level: @data.fetch(:level),
+          benchmark: @data[:benchmark],
+          profile: @data[:profile],
+          level: @data[:level],
           ignore_benchmark_errors: @data.fetch(:ignore_all, false),
-          xccdf_dir: @data.fetch(:xccdf_dir),
+          xccdf_dir: @data[:xccdf_dir],
         }
         AbideDevUtils::Output.simple('Generating coverage report...') unless quiet
         coverage = AbideDevUtils::CEM::Generate::CoverageReport.generate(format_func: :to_h, opts: generate_opts)
@@ -104,10 +105,13 @@ module Abide
           @data[:format] = f
         end
         options.on('-v', '--verbose', 'Verbose output') do
-          @data[:verbose] = true
+          @data[:debug] = true
         end
         options.on('-q', '--quiet', 'Quiet output') do
           @data[:quiet] = true
+        end
+        options.on('-s', '--strict', 'Fails if there are any errors') do
+          @data[:strict] = true
         end
       end
 
@@ -165,6 +169,60 @@ module Abide
         new_config_hiera, change_report = AbideDevUtils::CEM.update_legacy_config_from_diff(config_hiera, diff)
         AbideDevUtils::Output.yaml(new_config_hiera, console: @data[:verbose], file: @data[:out_file])
         AbideDevUtils::Output.simple(change_report) unless @data[:quiet]
+      end
+    end
+
+    class CemValidate < AbideCommand
+      CMD_NAME = 'validate'
+      CMD_SHORT = 'Validation commands for CEM modules'
+      CMD_LONG = 'Validation commands for CEM modules'
+      def initialize
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: true)
+        add_command(CemValidatePuppetStrings.new)
+      end
+    end
+
+    class CemValidatePuppetStrings < AbideCommand
+      CMD_NAME = 'puppet-strings'
+      CMD_SHORT = 'Validates the Puppet Strings documentation'
+      CMD_LONG = 'Validates the Puppet Strings documentation'
+      def initialize
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
+        options.on('-v', '--verbose', 'Verbose output') do
+          @data[:verbose] = true
+        end
+        options.on('-q', '--quiet', 'Quiet output') do
+          @data[:quiet] = true
+        end
+        options.on('-f [FORMAT]', '--format [FORMAT]', 'Format for output (text, json, yaml)') do |f|
+          @data[:format] = f
+        end
+        options.on('-o [FILE]', '--out-file [FILE]', 'Path to save the updated config file') do |o|
+          @data[:out_file] = o
+        end
+        options.on('-s', '--strict', 'Exits with exit code 1 if there are any warnings') do
+          @data[:strict] = true
+        end
+      end
+
+      def execute
+        @data[:format] ||= 'text'
+        AbideDevUtils::Validate.puppet_module_directory
+        output = AbideDevUtils::CEM::Validate::Strings.validate(**@data)
+        has_errors = false
+        has_warnings = false
+        output.each do |_, i|
+          has_errors = true if i.any? { |j| j[:errors].any? }
+          has_warnings = true if i.any? { |j| j[:warnings].any? }
+        end
+        AbideDevUtils::Output.send(
+          @data[:format].to_sym,
+          output,
+          console: !@data[:quiet],
+          file: @data[:out_file],
+          stringify: true,
+        )
+        exit 1 if has_errors || (has_warnings && @data[:strict])
       end
     end
   end

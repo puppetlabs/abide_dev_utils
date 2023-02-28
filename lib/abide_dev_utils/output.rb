@@ -10,30 +10,44 @@ require 'abide_dev_utils/files'
 module AbideDevUtils
   module Output
     FWRITER = AbideDevUtils::Files::Writer.new
-    def self.simple(msg, stream: $stdout)
-      stream.puts msg
+    def self.simple(msg, stream: $stdout, **_)
+      case msg
+      when Hash
+        stream.puts JSON.pretty_generate(msg)
+      else
+        stream.puts msg
+      end
     end
 
-    def self.json(in_obj, console: false, file: nil, pretty: true)
+    def self.text(msg, console: false, file: nil, **_)
+      simple(msg) if console
+      FWRITER.write_text(msg, file: file) unless file.nil?
+    end
+
+    def self.json(in_obj, console: false, file: nil, pretty: true, **_)
       AbideDevUtils::Validate.hashable(in_obj)
       json_out = pretty ? JSON.pretty_generate(in_obj) : JSON.generate(in_obj)
       simple(json_out) if console
       FWRITER.write_json(json_out, file: file) unless file.nil?
     end
 
-    def self.yaml(in_obj, console: false, file: nil)
+    def self.yaml(in_obj, console: false, file: nil, stringify: false, **_)
       yaml_out = if in_obj.is_a? String
                    in_obj
                  else
                    AbideDevUtils::Validate.hashable(in_obj)
-                   # Use object's #to_yaml method if it exists, convert to hash if not
-                   in_obj.respond_to?(:to_yaml) ? in_obj.to_yaml : in_obj.to_h.to_yaml
+                   if stringify
+                     JSON.parse(JSON.generate(in_obj)).to_yaml
+                   else
+                     # Use object's #to_yaml method if it exists, convert to hash if not
+                     in_obj.respond_to?(:to_yaml) ? in_obj.to_yaml : in_obj.to_h.to_yaml
+                   end
                  end
       simple(yaml_out) if console
       FWRITER.write_yaml(yaml_out, file: file) unless file.nil?
     end
 
-    def self.yml(in_obj, console: false, file: nil)
+    def self.yml(in_obj, console: false, file: nil, **_)
       AbideDevUtils::Validate.hashable(in_obj)
       # Use object's #to_yaml method if it exists, convert to hash if not
       yml_out = in_obj.respond_to?(:to_yaml) ? in_obj.to_yaml : in_obj.to_h.to_yaml
@@ -41,7 +55,7 @@ module AbideDevUtils
       FWRITER.write_yml(yml_out, file: file) unless file.nil?
     end
 
-    def self.progress(title: 'Progress', start: 0, total: 100, format: nil)
+    def self.progress(title: 'Progress', start: 0, total: 100, format: nil, **_)
       ProgressBar.create(title: title, starting_at: start, total: total, format: format)
     end
   end

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-require 'abide_dev_utils/cem/validate/resource_data'
+require_relative 'validate/resource_data'
+require_relative 'validate/strings'
 
 module AbideDevUtils
   module CEM

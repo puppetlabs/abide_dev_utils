@@ -49,6 +49,10 @@ module AbideDevUtils
       "#### #{text}\n"
     end
 
+    def paragraph(text)
+      "#{text}\n"
+    end
+
     def ul(text, indent: 0)
       indented_text = []
       indent.times { indented_text << '  ' } if indent.positive?

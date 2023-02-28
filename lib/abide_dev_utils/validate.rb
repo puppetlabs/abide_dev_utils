@@ -27,6 +27,14 @@ module AbideDevUtils
       raise AbideDevUtils::Errors::PathNotDirectoryError, path unless File.directory?(path)
     end
 
+    def self.populated_string?(thing)
+      return false if thing.nil?
+      return false unless thing.instance_of?(String)
+      return false if thing.empty?
+
+      true
+    end
+
     def self.populated_string(thing)
       raise AbideDevUtils::Errors::NotPopulatedStringError, 'Object is nil' if thing.nil?
 

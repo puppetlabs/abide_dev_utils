@@ -10,16 +10,29 @@ module AbideDevUtils
         attr_reader :manifest_file
 
         def initialize(manifest_file)
+          @compiler = Puppet::Pal::Compiler.new(nil)
           @manifest_file = File.expand_path(manifest_file)
           raise ArgumentError, "File #{@manifest_file} is not a file" unless File.file?(@manifest_file)
         end
 
         def ast
-          @ast ||= Puppet::Pal::Compiler.new(nil).parse_file(manifest_file)
+          @ast ||= non_validating_parse_file(manifest_file)
         end
 
         def declaration
           @declaration ||= Declaration.new(ast)
+        end
+
+        private
+
+        # This method gets around the normal validation performed by the regular
+        # Puppet::Pal::Compiler#parse_file method. This is necessary because, with
+        # validation enabled, the parser will raise errors during parsing if the
+        # file contains any calls to Facter. This is due to facter being disallowed
+        # in Puppet when evaluating the code in a scripting context instead of catalog
+        # compilation, which is what we are doing here.
+        def non_validating_parse_file(file)
+          @compiler.send(:internal_evaluator).parser.parse_file(file)&.model
         end
       end
 
