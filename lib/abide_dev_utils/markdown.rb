@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require 'tempfile'
+require 'fileutils'
+
 module AbideDevUtils
   # Formats text for output in markdown
   class Markdown
@@ -14,11 +17,17 @@ module AbideDevUtils
     def to_markdown
       toc = @toc.join("\n")
       body = @body.join("\n")
-      "#{@title}\n#{toc}\n\n#{body}"
+      "#{@title}\n#{toc}\n\n#{body}".encode(universal_newline: true)
     end
+    alias to_s to_markdown
 
     def to_file
-      File.write(@file, to_markdown)
+      this_markdown = to_markdown
+      Tempfile.create('markdown') do |f|
+        f.write(this_markdown)
+        check_file_content(f.path, this_markdown)
+        FileUtils.mv(f.path, @file)
+      end
     end
 
     def method_missing(name, *args, &block)
@@ -87,6 +96,14 @@ module AbideDevUtils
     end
 
     private
+
+    def check_file_content(file, content)
+      raise "File #{file} not found! Not saving to #{@file}" unless File.exist?(file)
+      raise "File #{file} is empty! Not saving to #{@file}" if File.zero?(file)
+      return if File.read(file).include?(content)
+
+      raise "File #{file} does not contain correct content! Not saving to #{@file}"
+    end
 
     def add(type, text, *args, **kwargs)
       @toc << ul(link(text, text, anchor: true), indent: 0) if @with_toc && type == :h1
