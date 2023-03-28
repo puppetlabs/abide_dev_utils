@@ -485,8 +485,6 @@ module AbideDevUtils
         raise AbideDevUtils::Errors::ResourceDataNotFoundError, facts if rdata_files.nil? || rdata_files.empty?
 
         YAML.load_file(rdata_files[0].path)
-      rescue StandardError => e
-        require 'pry'; binding.pry
       end
     end
   end
