@@ -236,12 +236,14 @@ module AbideDevUtils
           new_paths = []
           possible_fact_values.each do |pfv|
             new_path = path.dup
+            values = []
             pfv.each do |v|
               next unless v
 
+              values << v if v
               new_path.sub!(FACT_PATTERN, v)
             end
-            new_paths << EntryPathLocalFile.new(new_path, facts, possible_fact_values)
+            new_paths << EntryPathLocalFile.new(new_path, facts, values)
           end
           new_paths.uniq(&:path).select(&:exist?)
         end
@@ -249,16 +251,13 @@ module AbideDevUtils
 
       # Represents a local file derived from a Hiera path
       class EntryPathLocalFile
-        attr_reader :path, :facts
+        attr_reader :path, :facts, :values, :fact_values
 
-        def initialize(path, facts, possible_fact_values)
+        def initialize(path, facts, values)
           @path = File.expand_path(File.join(AbideDevUtils::Ppt::Hiera.default_datadir, path))
           @facts = facts
-          @possible_fact_values = possible_fact_values
-        end
-
-        def fact_values
-          @fact_values ||= fact_values_for_path
+          @values = values
+          @fact_values = @facts.zip(@values).to_h
         end
 
         def path_parts
@@ -278,22 +277,6 @@ module AbideDevUtils
             path: path,
             facts: facts
           }
-        end
-
-        private
-
-        def fact_values_for_path
-          no_fext_path_parts = path_parts.map { |part| File.basename(part, '.yaml') }
-          valid_fact_values = @possible_fact_values.select do |pfv|
-            pfv.all? { |v| no_fext_path_parts.include?(v) }
-          end
-          valid_fact_values.uniq! # Removes duplicate arrays, not duplicate fact values
-          valid_fact_values.flatten!
-          return {} if valid_fact_values.empty?
-
-          fact_vals = {}
-          facts.each_index { |idx| fact_vals[facts[idx]] = valid_fact_values[idx] }
-          fact_vals
         end
       end
     end
