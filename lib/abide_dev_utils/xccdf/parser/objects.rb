@@ -58,7 +58,7 @@ module AbideDevUtils
           end
 
           # Allows access to child objects by label
-          def method_missing(method_name, *args, &block)
+          def method_missing(method_name, *args, **kwargs, &block)
             m_name_string = method_name.to_s.downcase
             return @label_method_values[m_name_string] if @label_method_values.key?(m_name_string)
 
@@ -80,7 +80,7 @@ module AbideDevUtils
                                                 end
               @label_method_values[label_str]
             elsif search_children.respond_to?(method_name)
-              search_children.send(method_name, *args, &block)
+              search_children.send(method_name, *args, **kwargs, &block)
             else
               super
             end
