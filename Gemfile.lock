@@ -18,7 +18,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     CFPropertyList (2.3.6)
-    activesupport (7.0.4.1)
+    activesupport (7.0.4.3)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (>= 1.6, < 2)
       minitest (>= 5.1)
@@ -137,7 +137,7 @@ GEM
     memoist (0.16.2)
     method_source (1.0.0)
     mini_mime (1.1.2)
-    minitest (5.17.0)
+    minitest (5.18.0)
     mize (0.4.1)
       protocol (~> 2.0)
     multi_json (1.15.0)
@@ -146,6 +146,8 @@ GEM
     nokogiri (1.14.3-x86_64-darwin)
       racc (~> 1.4)
     nokogiri (1.14.3-x86_64-linux)
+      racc (~> 1.4)
+    nokogiri (1.14.2-x86_64-linux)
       racc (~> 1.4)
     oauth (0.6.2)
       snaky_hash (~> 2.0)
@@ -270,7 +272,7 @@ GEM
       sync
     traces (0.4.1)
     trailblazer-option (0.1.2)
-    tzinfo (2.0.5)
+    tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
     uber (0.1.0)
     unicode-display_width (2.1.0)
