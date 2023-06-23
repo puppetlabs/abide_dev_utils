@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require 'digest'
-require_relative './objects/digest_object'
+require_relative './objects/diffable_object'
 require_relative './objects/numbered_object'
 require_relative './helpers'
 
@@ -12,19 +11,28 @@ module AbideDevUtils
       module Objects
         # Base class for XCCDF element objects
         class ElementBase
-          include AbideDevUtils::XCCDF::Parser::Objects::DigestObject
-          include AbideDevUtils::XCCDF::Parser::Helpers::ElementChildren
+          include Comparable
+          include AbideDevUtils::XCCDF::Parser::Objects::DiffableObject
           include AbideDevUtils::XCCDF::Parser::Helpers::XPath
           extend AbideDevUtils::XCCDF::Parser::Helpers::XPath
-          attr_reader :children, :child_labels, :link_labels
 
-          def initialize(*_args, **_kwargs)
+          UNICODE_SYMBOLS = {
+            vertical: "\u2502",
+            horizontal: "\u2500",
+            tee: "\u251C",
+            corner: "\u2514"
+          }.freeze
+
+          attr_reader :children, :child_labels, :links, :link_labels, :parent
+
+          def initialize(*_args, parent_node: nil, **_kwargs)
+            @parent = parent_node
             @children = []
             @links = []
             @link_labels = []
             @child_labels = []
             @label_method_values = {}
-            exclude_from_digest(%i[@digest @children @child_labels @label @exclude_from_digest @label_method_values])
+            @similarity_methods = []
           end
 
           # For subclasses that are associated with a specific
@@ -57,41 +65,14 @@ module AbideDevUtils
             @label_method_values
           end
 
-          # Allows access to child objects by label
-          def method_missing(method_name, *args, **kwargs, &block)
-            m_name_string = method_name.to_s.downcase
-            return @label_method_values[m_name_string] if @label_method_values.key?(m_name_string)
-
-            label_str = m_name_string.start_with?('linked_') ? m_name_string.split('_')[1..].join('_') : m_name_string
-            if m_name_string.start_with?('linked_') && @link_labels.include?(label_str)
-              found = @links.select { |link| link.label == label_str }
-              @label_method_values["linked_#{label_str}"] = if found.length == 1
-                                                              found.first
-                                                            else
-                                                              found
-                                                            end
-              @label_method_values["linked_#{label_str}"]
-            elsif @child_labels.include?(label_str)
-              found = @children.select { |child| child.label == label_str }
-              @label_method_values[label_str] = if found.length == 1
-                                                  found.first
-                                                else
-                                                  found
-                                                end
-              @label_method_values[label_str]
-            elsif search_children.respond_to?(method_name)
-              search_children.send(method_name, *args, **kwargs, &block)
-            else
-              super
-            end
+          def inspect
+            "<#{self.class}:#{object_id}:\"#{self}\">"
           end
 
-          def respond_to_missing?(method_name, include_private = false)
-            m_name_string = method_name.to_s.downcase
-            label_str = m_name_string.start_with?('linked_') ? m_name_string.split('_')[1..].join('_') : m_name_string
-            (m_name_string.start_with?('linked_') && @link_labels.include?(label_str)) ||
-              @child_labels.include?(label_str) ||
-              super
+          def <=>(other)
+            return nil unless other.is_a?(self.class)
+
+            label <=> other.label
           end
 
           def label
@@ -108,21 +89,108 @@ module AbideDevUtils
             @label
           end
 
+          def find_similarity(other)
+            return [] unless other.is_a?(self.class)
+
+            @similarity_methods.each_with_object([]) do |method, ary|
+              val = send(method)
+              other_val = other.send(method)
+              ary << [method, val, other_val, val.eql?(other_val)]
+            end
+          end
+
           def add_link(object)
+            define_child_method(object.label, linked: true)
             @links << object
             @link_labels << object.label unless @link_labels.include?(object.label)
           end
 
           def add_links(objects)
-            objects.each { |object| add_object_as_child(object) }
+            objects.each { |object| add_link(object) }
+          end
+
+          def root?
+            parent.nil?
+          end
+
+          def root
+            return self if root?
+
+            parent.root
+          end
+
+          def leaf?
+            children.empty?
+          end
+
+          def siblings
+            return [] if root?
+
+            parent.children.reject { |child| child == self }
+          end
+
+          def ancestors
+            return [] if root?
+
+            [parent] + parent.ancestors
+          end
+
+          def descendants
+            return [] if leaf?
+
+            children + children.map(&:descendants).flatten
+          end
+
+          def depth
+            return 0 if root?
+
+            1 + parent.depth
+          end
+
+          def print_tree
+            puts tree_string_parts.join("\n")
+          end
+
+          protected
+
+          def tree_string_parts(indent = 0, parts = [])
+            parts << if indent.zero?
+                       "#{UNICODE_SYMBOLS[:vertical]} #{inspect}".encode('utf-8')
+                     elsif !children.empty?
+                       "#{UNICODE_SYMBOLS[:tee]}#{UNICODE_SYMBOLS[:horizontal] * indent} #{inspect}".encode('utf-8')
+                     else
+                       "#{UNICODE_SYMBOLS[:corner]}#{UNICODE_SYMBOLS[:horizontal] * indent} #{inspect}".encode('utf-8')
+                     end
+            children.each { |c| c.tree_string_parts(indent + 2, parts) } unless children.empty?
+            parts
           end
 
           private
+
+          def similarity_methods(*methods)
+            @similarity_methods = methods
+          end
 
           def with_safe_methods(default: nil)
             yield
           rescue NoMethodError
             default
+          end
+
+          def define_child_method(child_label, linked: false)
+            method_name = linked ? "linked_#{child_label}" : child_label
+            self.class.define_method method_name do
+              found = if method_name.start_with?('linked_')
+                        @links.select { |l| l.label == child_label }
+                      else
+                        children.select { |c| c.label == child_label }
+                      end
+              if found.length == 1
+                found.first
+              else
+                found
+              end
+            end
           end
 
           def add_child(klass, element, *args, **kwargs)
@@ -131,7 +199,8 @@ module AbideDevUtils
             real_element = klass.xpath.nil? ? element : find_element.at_xpath(element, klass.xpath)
             return if real_element.nil?
 
-            obj = new_object(klass, real_element, *args, **kwargs)
+            obj = new_object(klass, real_element, *args, parent_node: self, **kwargs)
+            define_child_method(obj.label)
             @children << obj
             @child_labels << obj.label unless @child_labels.include?(obj.label)
           rescue StandardError => e
@@ -149,7 +218,8 @@ module AbideDevUtils
             return if real_elements.nil?
 
             real_elements.each do |e|
-              obj = new_object(klass, e, *args, **kwargs)
+              obj = new_object(klass, e, *args, parent_node: self, **kwargs)
+              define_child_method(obj.label)
               @children << obj
               @child_labels << obj.label unless @child_labels.include?(obj.label)
             end
@@ -170,10 +240,18 @@ module AbideDevUtils
         class ShortText < ElementBase
           attr_reader :text
 
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             text = element.respond_to?(:text) ? element.text : element
             @text = text.to_s
+          end
+
+          def eql?(other)
+            text == other.text
+          end
+
+          def hash
+            text.hash
           end
 
           def to_s
@@ -185,11 +263,20 @@ module AbideDevUtils
         class LongText < ElementBase
           attr_reader :text
 
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             text = element.respond_to?(:text) ? element.text : element
             @text = text.to_s
             @string_text = text.to_s.tr("\n", ' ').gsub(/\s+/, ' ')
+            similarity_methods :to_s
+          end
+
+          def eql?(other)
+            @string_text == other.to_s
+          end
+
+          def hash
+            @string_text.hash
           end
 
           def to_s
@@ -201,10 +288,19 @@ module AbideDevUtils
         class AttributeValue < ElementBase
           attr_reader :attribute, :value
 
-          def initialize(element, attribute)
+          def initialize(element, attribute, parent_node: nil)
             super
             @attribute = attribute
             @value = element[attribute]
+            similarity_methods :attribute, :value
+          end
+
+          def eql?(other)
+            @attribute == other.attribute && @value == other.value
+          end
+
+          def hash
+            to_s.hash
           end
 
           def to_s
@@ -214,7 +310,7 @@ module AbideDevUtils
 
         # Class for an XCCDF element title
         class Title < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(ShortText, element)
           end
@@ -223,14 +319,22 @@ module AbideDevUtils
             'title'
           end
 
+          def eql?(other)
+            to_s == other.to_s
+          end
+
+          def hash
+            to_s.hash
+          end
+
           def to_s
-            search_children.find_child_by_class(ShortText).to_s
+            text.to_s
           end
         end
 
         # Class for an XCCDF element description
         class Description < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(LongText, element)
           end
@@ -239,8 +343,16 @@ module AbideDevUtils
             'description'
           end
 
+          def eql?(other)
+            to_s == other.to_s
+          end
+
+          def hash
+            to_s.hash
+          end
+
           def to_s
-            search_children.find_child_by_class(LongText).to_s
+            text.to_s
           end
         end
 
@@ -248,10 +360,24 @@ module AbideDevUtils
         class ElementWithId < ElementBase
           attr_reader :id
 
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(AttributeValue, element, 'id')
-            @id = search_children.find_child_by_attribute('id').value.to_s
+            @id = descendants.find { |d| d.label == 'id' }.value
+          end
+
+          def <=>(other)
+            return nil unless other.instance_of?(self.class)
+
+            @id <=> other.id.value
+          end
+
+          def eql?(other)
+            @id == other.id.value
+          end
+
+          def hash
+            @id.hash
           end
 
           def to_s
@@ -263,10 +389,24 @@ module AbideDevUtils
         class ElementWithIdref < ElementBase
           attr_reader :idref
 
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(AttributeValue, element, 'idref')
-            @idref = search_children.find_child_by_attribute('idref').value.to_s
+            @idref = descendants.find { |d| d.label == 'idref' }.value
+          end
+
+          def <=>(other)
+            return nil unless other.instance_of?(self.class)
+
+            @idref <=> other.idref.value
+          end
+
+          def eql?(other)
+            @idref == other.idref.value
+          end
+
+          def hash
+            @idref.hash
           end
 
           def to_s
@@ -276,9 +416,14 @@ module AbideDevUtils
 
         # Class for an XCCDF select element
         class XccdfSelect < ElementWithIdref
-          def initialize(element)
+          attr_reader :number, :title
+
+          def initialize(element, parent_node: nil)
             super
             add_child(AttributeValue, element, 'selected')
+            @number = to_s[/([0-9]+\.)+[0-9]+|([0-9]+)/]
+            @title = to_s[/[A-Z].*$/]
+            similarity_methods :number, :title
           end
 
           def self.xpath
@@ -288,11 +433,12 @@ module AbideDevUtils
 
         # Class for XCCDF profile
         class Profile < ElementWithId
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(Title, element)
             add_child(Description, element)
             add_children(XccdfSelect, element)
+            similarity_methods :id, :title, :level, :description, :xccdf_select
           end
 
           def level
@@ -313,13 +459,14 @@ module AbideDevUtils
           include AbideDevUtils::XCCDF::Parser::Objects::NumberedObject
           attr_reader :number
 
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             @number = to_s[/group_([0-9]+\.)+[0-9]+|group_([0-9]+)/]&.gsub(/group_/, '')
             add_child(Title, element)
             add_child(Description, element)
             add_children(Group, element)
             add_children(Rule, element)
+            similarity_methods :title, :number
           end
 
           def self.xpath
@@ -329,7 +476,7 @@ module AbideDevUtils
 
         # Class for XCCDF check-export
         class CheckExport < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(AttributeValue, element, 'export-name')
             add_child(AttributeValue, element, 'value-id')
@@ -339,14 +486,22 @@ module AbideDevUtils
             'check-export'
           end
 
+          def eql?(other)
+            to_s == other.to_s
+          end
+
+          def hash
+            to_s.hash
+          end
+
           def to_s
-            [search_children.find_child_by_attribute('export-name').to_s, search_children.find_child_by_attribute('value-id').to_s].join('|')
+            [export_name.to_s, value_id.to_s].join('|')
           end
         end
 
         # Class for XCCDF check-content-ref
         class CheckContentRef < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(AttributeValue, element, 'href')
             add_child(AttributeValue, element, 'name')
@@ -356,18 +511,34 @@ module AbideDevUtils
             'check-content-ref'
           end
 
+          def eql?(other)
+            to_s == other.to_s
+          end
+
+          def hash
+            to_s.hash
+          end
+
           def to_s
-            [search_children.find_child_by_attribute('href').to_s, search_children.find_child_by_attribute('name').to_s].join('|')
+            [href.to_s, name.to_s].join('|')
           end
         end
 
         # Class for XCCDF check
         class Check < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(AttributeValue, element, 'system')
             add_children(CheckExport, element)
             add_children(CheckContentRef, element)
+          end
+
+          def eql?(other)
+            @children.map(&:to_s).join == other.children.map(&:to_s).join
+          end
+
+          def hash
+            @children.map(&:to_s).join.hash
           end
 
           def self.xpath
@@ -377,10 +548,20 @@ module AbideDevUtils
 
         # Class for XCCDF Ident ControlURI element
         class ControlURI < ElementBase
-          def initialize(element)
+          attr_reader :namespace, :value
+
+          def initialize(element, parent_node: nil)
             super
             @namespace = element.attributes['controlURI'].namespace.prefix
             @value = element.attributes['controlURI'].value
+          end
+
+          def eql?(other)
+            to_s == other.to_s
+          end
+
+          def hash
+            to_s.hash
           end
 
           def to_s
@@ -390,10 +571,20 @@ module AbideDevUtils
 
         # Class for XCCDF Ident System element
         class System < ElementBase
-          def initialize(element)
+          attr_reader :system, :text
+
+          def initialize(element, parent_node: nil)
             super
             @system = element.attributes['system'].value
             @text = element.text
+          end
+
+          def eql?(other)
+            to_s == other.to_s
+          end
+
+          def hash
+            to_s.hash
           end
 
           def to_s
@@ -403,10 +594,18 @@ module AbideDevUtils
 
         # Class for XCCDF rule ident
         class Ident < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             with_safe_methods { add_child(ControlURI, element) }
             with_safe_methods { add_child(System, element) }
+          end
+
+          def eql?(other)
+            to_s == other.to_s
+          end
+
+          def hash
+            to_s.hash
           end
 
           def self.xpath
@@ -422,10 +621,18 @@ module AbideDevUtils
         class ComplexCheck < ElementBase
           attr_reader :operator, :check
 
-          def initialize(element, parent: nil)
+          def initialize(element, parent: nil, parent_node: nil)
             super
             add_child(AttributeValue, element, 'operator')
             add_children(Check, element)
+          end
+
+          def eql?(other)
+            @children.map(&:to_s).join == other.children.map(&:to_s).join
+          end
+
+          def hash
+            @children.map(&:to_s).join.hash
           end
 
           def self.xpath
@@ -435,13 +642,21 @@ module AbideDevUtils
 
         # Class for XCCDF rule metadata cis_controls framework safeguard
         class MetadataCisControlsFrameworkSafeguard < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(ShortText, element['title'])
             add_child(ShortText, element['urn'])
             new_implementation_groups(element)
             add_child(ShortText, find_element.at_xpath(element, 'asset_type').text)
             add_child(ShortText, find_element.at_xpath(element, 'security_function').text)
+          end
+
+          def eql?(other)
+            @children.map(&:to_s).join == other.children.map(&:to_s).join
+          end
+
+          def hash
+            @children.map(&:hash).join.hash
           end
 
           def self.xpath
@@ -466,10 +681,18 @@ module AbideDevUtils
 
         # Class for XCCDF rule metadata cis_controls framework
         class MetadataCisControlsFramework < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(AttributeValue, element, 'urn')
             add_children(MetadataCisControlsFrameworkSafeguard, element)
+          end
+
+          def eql?(other)
+            @children.map(&:to_s).join == other.children.map(&:to_s).join
+          end
+
+          def hash
+            @children.map(&:hash).join.hash
           end
 
           def self.xpath
@@ -483,10 +706,18 @@ module AbideDevUtils
 
         # Class for XCCDF metadata cis_controls element
         class MetadataCisControls < ElementBase
-          def initialize(element, parent: nil)
+          def initialize(element, parent: nil, parent_node: nil)
             super
             add_child(AttributeValue, element, 'controls')
             add_children(MetadataCisControlsFramework, element)
+          end
+
+          def eql?(other)
+            @children.map(&:to_s).join == other.children.map(&:to_s).join
+          end
+
+          def hash
+            @children.map(&:hash).join.hash
           end
 
           def self.xpath
@@ -503,9 +734,17 @@ module AbideDevUtils
 
         # Class for XCCDF rule metadata element
         class Metadata < ElementBase
-          def initialize(element, parent: nil)
+          def initialize(element, parent: nil, parent_node: nil)
             super
             add_children(MetadataCisControls, element)
+          end
+
+          def eql?(other)
+            @children.map(&:to_s).join == other.children.map(&:to_s).join
+          end
+
+          def hash
+            @children.map(&:hash).join.hash
           end
 
           def self.xpath
@@ -515,13 +754,17 @@ module AbideDevUtils
 
         # Class for XCCDF Rule child element Rationale
         class Rationale < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(LongText, element)
           end
 
-          def digest
-            @digest ||= find_child_by_class(LongText).digest
+          def eql?(other)
+            to_s == other.to_s
+          end
+
+          def hash
+            to_s.hash
           end
 
           def self.xpath
@@ -535,13 +778,17 @@ module AbideDevUtils
 
         # Class for XCCDF Rule child element Fixtext
         class Fixtext < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(LongText, element)
           end
 
-          def digest
-            @digest ||= search_children.find_child_by_class(LongText).digest
+          def eql?(other)
+            to_s == other.to_s
+          end
+
+          def hash
+            to_s.hash
           end
 
           def self.xpath
@@ -549,7 +796,7 @@ module AbideDevUtils
           end
 
           def to_s
-            search_children.find_child_by_class(LongText).to_s
+            text.to_s
           end
         end
 
@@ -558,7 +805,7 @@ module AbideDevUtils
           include AbideDevUtils::XCCDF::Parser::Objects::NumberedObject
           attr_reader :number
 
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             @number = to_s[/([0-9]+\.)+[0-9]+/]
             add_child(AttributeValue, element, 'role')
@@ -572,6 +819,7 @@ module AbideDevUtils
             add_children(Check, element)
             add_child(ComplexCheck, element)
             add_child(Metadata, element)
+            similarity_methods :number, :title
           end
 
           def self.xpath
@@ -581,7 +829,7 @@ module AbideDevUtils
 
         # Class for XCCDF Value
         class Value < ElementWithId
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(AttributeValue, element, 'operator')
             add_child(AttributeValue, element, 'type')
@@ -590,21 +838,53 @@ module AbideDevUtils
             add_child(ShortText, find_element.at_xpath(element, 'value'))
           end
 
+          def <=>(other)
+            return nil unless other.instance_of?(self.class)
+
+            title.to_s <=> other.title.to_s
+          end
+
+          def eql?(other)
+            operator.value == other.operator.value &&
+              type.value == other.type.value &&
+              title.to_s == other.title.to_s &&
+              description.to_s == other.description.to_s &&
+              text == other.text
+          end
+
+          def hash
+            [
+              operator.value,
+              type.value,
+              title.to_s,
+              description.to_s,
+              text,
+            ].join.hash
+          end
+
           def self.xpath
             'Value'
           end
 
           def to_s
-            search_children.find_child_by_class(Title).to_s
+            "#{title}: #{type.value} #{operator.value} #{text}"
           end
         end
 
         # Class for XCCDF benchmark status
         class Status < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(ShortText, element)
             add_child(AttributeValue, element, 'date')
+          end
+
+          def eql?(other)
+            to_s == other.to_s
+          end
+
+          def hash
+            to_s.hash
           end
 
           def self.xpath
@@ -613,17 +893,25 @@ module AbideDevUtils
 
           def to_s
             [
-              "Status:#{search_children.find_child_by_class(ShortText)}",
-              "Date:#{search_children.find_child_by_class(AttributeValue)}",
+              "Status:#{text}",
+              "Date:#{date}",
             ].join('|')
           end
         end
 
         # Class for XCCDF benchmark version
         class Version < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(ShortText, element)
+          end
+
+          def eql?(other)
+            to_s == other.to_s
+          end
+
+          def hash
+            to_s.hash
           end
 
           def self.xpath
@@ -631,15 +919,23 @@ module AbideDevUtils
           end
 
           def to_s
-            search_children.find_child_by_class(ShortText).to_s
+            text.to_s
           end
         end
 
         # Class for XCCDF benchmark platform
         class Platform < ElementBase
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             add_child(AttributeValue, element, 'idref')
+          end
+
+          def eql?(other)
+            to_s == other.to_s
+          end
+
+          def hash
+            to_s.hash
           end
 
           def self.xpath
@@ -647,7 +943,7 @@ module AbideDevUtils
           end
 
           def to_s
-            search_children.find_child_by_class(AttributeValue).to_s
+            idref.to_s
           end
         end
 
@@ -655,7 +951,7 @@ module AbideDevUtils
         class Benchmark < ElementBase
           include AbideDevUtils::XCCDF::Parser::Objects::NumberedObject
 
-          def initialize(element)
+          def initialize(element, parent_node: nil)
             super
             elem = find_element.at_xpath(element, 'Benchmark')
             raise 'No Benchmark element found' if elem.nil?
@@ -670,12 +966,40 @@ module AbideDevUtils
             add_children(Value, elem)
           end
 
+          def number
+            @number ||= version.to_s[/([0-9]+\.)+[0-9]+/]
+          end
+
+          def to_h
+            {
+              title: title.to_s,
+              version: version.to_s,
+              status: status.to_s,
+              platform: platform.to_s,
+              profile: profile.map(&:to_h),
+              group: group.map(&:to_h),
+              value: value.map(&:to_h),
+            }
+          end
+
+          def diff_only_rules(other, profile: nil, level: nil)
+            self_rules = descendants.select { |x| x.is_a?(Rule) }
+            other_rules = other.descendants.select { |x| x.is_a?(Rule) }
+            unless profile.nil?
+              self_rules = self_rules.select { |x| x.linked_profile.any? { |p| p.title.to_s.match?(profile) } }
+            end
+            unless level.nil?
+              self_rules = self_rules.select { |x| x.linked_profile.any? { |p| p.level.to_s.match?(level) } }
+            end
+            diff_array_obj(self_rules, other_rules)
+          end
+
           def self.xpath
             'Benchmark'
           end
 
           def to_s
-            [search_children.find_child_by_class(Title).to_s, search_children.find_child_by_class(Version).to_s].join(' ')
+            [title.to_s, version.to_s].join(' ')
           end
         end
       end

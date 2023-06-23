@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'yaml'
+require_relative 'files'
 
 module AbideDevUtils
   module Config
@@ -9,15 +9,12 @@ module AbideDevUtils
     def self.to_h(path = DEFAULT_PATH)
       return {} unless File.file?(path)
 
-      h = YAML.safe_load(File.open(path), [Symbol])
+      h = AbideDevUtils::Files::Reader.read(path)
       h.transform_keys(&:to_sym)
     end
 
     def to_h(path = DEFAULT_PATH)
-      return {} unless File.file?(path)
-
-      h = YAML.safe_load(File.open(path), [Symbol])
-      h.transform_keys(&:to_sym)
+      self.class.to_h(path)
     end
 
     def self.config_section(section, path = DEFAULT_PATH)

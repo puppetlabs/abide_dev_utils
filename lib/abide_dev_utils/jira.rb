@@ -11,6 +11,7 @@ module AbideDevUtils
     ERRORS = AbideDevUtils::Errors::Jira
     COV_PARENT_SUMMARY_PREFIX = '::BENCHMARK:: '
     COV_CHILD_SUMMARY_PREFIX = '::CONTROL:: '
+    UPD_EPIC_SUMMARY_PREFIX = '::BENCHMARK UPDATE::'
     PROGRESS_BAR_FORMAT = '%a %e %P% Created: %c of %C'
 
     def self.project(client, project)
@@ -58,7 +59,7 @@ module AbideDevUtils
       iss.save
     end
 
-    def self.new_issue(client, project, summary, labels: ['abide_dev_utils'], epic: nil, dry_run: false)
+    def self.new_issue(client, project, summary, description: nil, labels: ['abide_dev_utils'], epic: nil, dry_run: false)
       if dry_run
         sleep(0.2)
         return Dummy.new(summary)
@@ -69,6 +70,7 @@ module AbideDevUtils
       fields['reporter'] = myself(client)
       fields['issuetype'] = issuetype(client, 'Task')
       fields['priority'] = priority(client, '6')
+      fields['description'] = description if description
       fields['labels'] = labels
       epic = issue(client, epic) if epic && !epic.is_a?(JIRA::Resource::Issue)
       fields['customfield_10006'] = epic.key if epic # Epic_Link
@@ -221,6 +223,72 @@ module AbideDevUtils
         abrev = control_summary.length > 40 ? control_summary[0..60] : control_summary
         progress.log("#{dr_prefix(dry_run)}Creating #{abrev}...")
         new_issue(client, project.key, control_summary, labels: labels, epic: epic, dry_run: dry_run)
+        progress.increment
+      end
+      progress.finish
+      AbideDevUtils::Output.simple("#{dr_prefix(dry_run)}Done creating tasks in Epic '#{epic.summary}'")
+    end
+
+    def self.new_issues_from_xccdf_diff(client, project, xccdf1_path, xccdf2_path, epic: nil, dry_run: false, auto_approve: false, diff_opts: {})
+      require 'abide_dev_utils/xccdf/diff'
+      diff = AbideDevUtils::XCCDF::Diff::BenchmarkDiff.new(xccdf1_path, xccdf2_path, diff_opts)
+      i_attrs = all_project_issues_attrs(project)
+      # We need to get the actual epic Issue object, or create it if it doesn't exist
+      epic = if epic.nil?
+               new_epic_summary = "#{UPD_EPIC_SUMMARY_PREFIX}#{diff.this.title}: v#{diff.this.version} -> #{diff.other.version}"
+               if summary_exist?(new_epic_summary, i_attrs)
+                 issue(client, new_epic_summary)
+               else
+                 unless AbideDevUtils::Prompt.yes_no("#{dr_prefix(dry_run)}Create new epic '#{new_epic_summary}'?", auto_approve: auto_approve)
+                   AbideDevUtils::Output.simple("#{dr_prefix(dry_run)}Aborting")
+                   exit(0)
+                 end
+                 new_epic(client, project.key, new_epic_summary, dry_run: dry_run)
+               end
+             else
+               issue(client, epic)
+             end
+      to_create = {}
+      diff.diff[:rules].each do |key, val|
+        next if val.empty?
+
+        val.each do |v|
+          case key
+          when :added
+            sum = "Add rule #{v[:number]} - #{v[:title]}"
+            sum = "#{sum[0..60]}..." if sum.length > 60
+            to_create[sum] = <<~DESC
+              Rule #{v[:number]} - #{v[:title]} is added with #{diff.other.title} #{diff.other.version}
+            DESC
+          when :removed
+            sum = "Remove rule #{v[:number]} - #{v[:title]}"
+            sum = "#{sum[0..60]}..." if sum.length > 60
+            to_create[sum] = <<~DESC
+              Rule #{v[:number]} - #{v[:title]} is removed from #{diff.this.title} #{diff.this.version}
+            DESC
+          else
+            sum = "Update rule \"#{v[:from]}\""
+            sum = "#{sum[0..60]}..." if sum.length > 60
+            to_create[sum] = <<~DESC
+              Rule #{v[:from]} is updated in #{diff.other.title} #{diff.other.version}:
+              #{v[:changes].collect { |k, v| "#{k}: #{v}" }.join("\n")}
+            DESC
+          end
+        end
+      end
+      approved_create = {}
+      to_create.each do |summary, description|
+        if AbideDevUtils::Prompt.yes_no("#{dr_prefix(dry_run)}Create new issue '#{summary}' with description:\n#{description}", auto_approve: auto_approve)
+          approved_create[summary] = description
+        end
+      end
+      AbideDevUtils::Output.simple("#{dr_prefix(dry_run)}Creating #{approved_create.keys.count} new Jira issues")
+      progress = AbideDevUtils::Output.progress(title: "#{dr_prefix(dry_run)}Creating issues",
+                                                total: approved_create.keys.count,
+                                                format: PROGRESS_BAR_FORMAT)
+      approved_create.each do |summary, description|
+        progress.log("#{dr_prefix(dry_run)}Creating #{summary}...")
+        new_issue(client, project.key, summary, description: description, labels: [], epic: epic, dry_run: dry_run)
         progress.increment
       end
       progress.finish

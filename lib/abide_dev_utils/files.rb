@@ -12,12 +12,7 @@ module AbideDevUtils
         extension = File.extname(path)
         case extension
         when /\.yaml|\.yml/
-          require 'yaml'
-          if safe
-            YAML.safe_load(File.read(path))
-          else
-            YAML.load_file(path)
-          end
+          read_yaml(path, safe: safe, opts: opts)
         when '.json'
           require 'json'
           return JSON.parse(File.read(path), opts) if safe
@@ -32,6 +27,21 @@ module AbideDevUtils
           end
         else
           File.read(path)
+        end
+      end
+
+      def self.read_yaml(path, safe: true, opts: { permitted_classes: [Symbol] })
+        permitted_classes = opts[:permitted_classes] || [Symbol]
+        if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.0.0')
+          require 'psych'
+          return Psych.safe_load_file(path, permitted_classes: permitted_classes) if safe
+
+          Psych.load_file(path)
+        else
+          require 'yaml'
+          return YAML.safe_load(File.read(path), permitted_classes) if safe
+
+          YAML.load(File.read(path)) # rubocop:disable Security/YAMLLoad
         end
       end
     end

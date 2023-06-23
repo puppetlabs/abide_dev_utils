@@ -4,7 +4,7 @@ require 'abide_dev_utils/cem'
 require 'abide_dev_utils/files'
 require 'abide_dev_utils/output'
 require 'abide_dev_utils/validate'
-require 'abide_dev_utils/xccdf/diff/benchmark'
+require 'abide_dev_utils/xccdf/diff'
 require 'abide_dev_utils/cli/abstract'
 
 module Abide
@@ -162,13 +162,14 @@ module Abide
       end
 
       def execute(config_file, cur_xccdf, new_xccdf)
-        AbideDevUtils::Validate.file(config_file, extension: 'yaml')
-        AbideDevUtils::Validate.file(cur_xccdf, extension: 'xml')
-        config_hiera = AbideDevUtils::Files::Reader.read(config_file, safe: true)
-        diff = AbideDevUtils::XCCDF::Diff::BenchmarkDiff.new(cur_xccdf, new_xccdf).diff[:diff][:number_title]
-        new_config_hiera, change_report = AbideDevUtils::CEM.update_legacy_config_from_diff(config_hiera, diff)
-        AbideDevUtils::Output.yaml(new_config_hiera, console: @data[:verbose], file: @data[:out_file])
-        AbideDevUtils::Output.simple(change_report) unless @data[:quiet]
+        warn 'This command is currently non-functional'
+        # AbideDevUtils::Validate.file(config_file, extension: 'yaml')
+        # AbideDevUtils::Validate.file(cur_xccdf, extension: 'xml')
+        # config_hiera = AbideDevUtils::Files::Reader.read(config_file, safe: true)
+        # diff = AbideDevUtils::XCCDF::Diff::BenchmarkDiff.new(cur_xccdf, new_xccdf).diff[:diff][:number_title]
+        # new_config_hiera, change_report = AbideDevUtils::CEM.update_legacy_config_from_diff(config_hiera, diff)
+        # AbideDevUtils::Output.yaml(new_config_hiera, console: @data[:verbose], file: @data[:out_file])
+        # AbideDevUtils::Output.simple(change_report) unless @data[:quiet]
       end
     end
 

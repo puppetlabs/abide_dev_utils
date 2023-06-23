@@ -37,16 +37,7 @@ module AbideDevUtils
     # Diffs two xccdf files
     def self.diff(file1, file2, opts)
       require 'abide_dev_utils/xccdf/diff'
-      bm1 = Benchmark.new(file1)
-      bm2 = Benchmark.new(file2)
-      AbideDevUtils::XCCDF::Diff.diff_benchmarks(bm1, bm2, opts)
-    end
-
-    # Use new-style diff
-    def self.new_style_diff(file1, file2, opts)
-      require 'abide_dev_utils/xccdf/diff/benchmark'
-      bm_diff = AbideDevUtils::XCCDF::Diff::BenchmarkDiff.new(file1, file2, opts)
-      bm_diff.diff
+      AbideDevUtils::XCCDF::Diff.benchmark_diff(file1, file2, opts)
     end
 
     # Common constants and methods included by nearly everything else

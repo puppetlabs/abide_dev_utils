@@ -23,6 +23,7 @@ module Abide
         add_command(JiraNewIssueCommand.new)
         add_command(JiraFromCoverageCommand.new)
         add_command(JiraFromXccdfCommand.new)
+        add_command(JiraFromXccdfDiffCommand.new)
       end
     end
 
@@ -46,7 +47,7 @@ module Abide
     end
 
     class JiraGetIssueCommand < CmdParse::Command
-      CMD_NAME = 'get_issue'
+      CMD_NAME = 'get-issue'
       CMD_SHORT = 'Gets a specific issue'
       CMD_LONG = 'Returns JSON of a specific issue from key (<project>-<num>)'
       def initialize
@@ -67,7 +68,7 @@ module Abide
     end
 
     class JiraNewIssueCommand < CmdParse::Command
-      CMD_NAME = 'new_issue'
+      CMD_NAME = 'new-issue'
       CMD_SHORT = 'Creates a new issue in a project'
       CMD_LONG = 'Allows you to create a new issue in a project'
       def initialize
@@ -93,7 +94,7 @@ module Abide
     end
 
     class JiraFromCoverageCommand < CmdParse::Command
-      CMD_NAME = 'from_coverage'
+      CMD_NAME = 'from-coverage'
       CMD_SHORT = 'Creates a parent issue with subtasks from a coverage report'
       CMD_LONG = 'Creates a parent issue with subtasks for a benchmark and any uncovered controls'
       def initialize
@@ -116,7 +117,7 @@ module Abide
     end
 
     class JiraFromXccdfCommand < CmdParse::Command
-      CMD_NAME = 'from_xccdf'
+      CMD_NAME = 'from-xccdf'
       CMD_SHORT = 'Creates a parent issue with subtasks from a xccdf file'
       CMD_LONG = 'Creates a parent issue with subtasks for a benchmark and any uncovered controls'
       def initialize
@@ -134,6 +135,49 @@ module Abide
         client = JIRA.client(options: {})
         proj = JIRA.project(client, project)
         JIRA.new_issues_from_xccdf(client, proj, path, epic: @data[:epic], dry_run: @data[:dry_run])
+      end
+    end
+
+    class JiraFromXccdfDiffCommand < CmdParse::Command
+      CMD_NAME = 'from-xccdf-diff'
+      CMD_SHORT = 'Creates an Epic with tasks from a xccdf diff'
+      CMD_LONG = 'Creates an Epic with tasks for changes in a diff of two XCCDF files'
+      def initialize
+        super(CMD_NAME, takes_commands: false)
+        short_desc(CMD_SHORT)
+        long_desc(CMD_LONG)
+        argument_desc(PATH1: 'An XCCDF file', PATH2: 'An XCCDF file', PROJECT: 'A Jira project')
+        options.on('-d', '--dry-run', 'Print to console instead of saving objects') { |_| @data[:dry_run] = true }
+        options.on('-y', '--yes', 'Automatically approve all yes / no prompts') { |_| @data[:auto_approve] = true }
+        options.on('-e [EPIC]', '--epic [EPIC]', 'If given, tasks will be created and assigned to this epic. Takes form <PROJECT>-<NUM>') { |e| @data[:epic] = e }
+        options.on('-p [PROFILE]', '--profile', 'Only diff rules belonging to the matching profile. Takes a string that is treated as RegExp') do |x|
+          @data[:diff_opts] ||= {}
+          @data[:diff_opts][:profile] = x
+        end
+        options.on('-l [LEVEL]', '--level', 'Only diff rules belonging to the matching level. Takes a string that is treated as RegExp') do |x|
+          @data[:diff_opts] ||= {}
+          @data[:diff_opts][:level] = x
+        end
+        options.on('-i [PROPS]', '--ignore-changed-properties', 'Ignore changes to specified properties. Takes a comma-separated list.') do |x|
+          @data[:diff_opts] ||= {}
+          @data[:diff_opts][:ignore_changed_properties] = x.split(',')
+        end
+      end
+
+      def execute(path1, path2, project)
+        Abide::CLI::VALIDATE.file(path1)
+        Abide::CLI::VALIDATE.file(path2)
+        @data[:dry_run] = false if @data[:dry_run].nil?
+        client = JIRA.client(options: {})
+        proj = JIRA.project(client, project)
+        JIRA.new_issues_from_xccdf_diff(client,
+                                        proj,
+                                        path1,
+                                        path2,
+                                        epic: @data[:epic],
+                                        dry_run: @data[:dry_run],
+                                        auto_approve: @data[:auto_approve],
+                                        diff_opts: @data[:diff_opts])
       end
     end
   end
