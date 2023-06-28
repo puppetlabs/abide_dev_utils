@@ -41,7 +41,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'selenium-webdriver', '~> 4.0.0.beta4'
   spec.add_dependency 'google-cloud-storage', '~> 1.34'
   spec.add_dependency 'hashdiff', '~> 1.0'
-  spec.add_dependency 'amatch', '~> 0.4'
   spec.add_dependency 'facterdb', '>= 1.21'
 
   # Dev dependencies

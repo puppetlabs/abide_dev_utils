@@ -27,10 +27,10 @@ module AbideDevUtils
         def self.link_profile_rules(benchmark)
           return unless benchmark.respond_to?(:profile)
 
-          rules = benchmark.find_children_by_class(AbideDevUtils::XCCDF::Parser::Objects::Rule, recurse: true)
+          rules = benchmark.descendants.select { |d| d.label == 'rule' }
           benchmark.profile.each do |profile|
             profile.xccdf_select.each do |sel|
-              rules.select { |rule| rule.id == sel.idref }.each do |rule|
+              rules.select { |rule| rule.id.value == sel.idref.value }.each do |rule|
                 rule.add_link(profile)
                 profile.add_link(rule)
               end
@@ -41,14 +41,13 @@ module AbideDevUtils
         def self.link_rule_values(benchmark)
           return unless benchmark.respond_to?(:value)
 
-          rules = benchmark.find_children_by_class(AbideDevUtils::XCCDF::Parser::Objects::Rule, recurse: true)
+          rules = benchmark.descendants.select { |d| d.label == 'rule' }
           benchmark.value.each do |value|
-            rules.each do |rule|
-              unless rule.find_children_by_attribute_value('value-id', value.id, recurse: true).empty?
-                rule.add_link(value)
-                value.add_link(rule)
-              end
-            end
+            rule = rules.find { |r| r.title.to_s == value.title.to_s }
+            next unless rule
+
+            rule.add_link(value)
+            value.add_link(rule)
           end
         end
       end

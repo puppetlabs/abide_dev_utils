@@ -4,7 +4,9 @@ require 'io/console'
 
 module AbideDevUtils
   module Prompt
-    def self.yes_no(msg)
+    def self.yes_no(msg, auto_approve: false)
+      return true if auto_approve
+
       print "#{msg} (Y/n): "
       return true if $stdin.cooked(&:gets).match?(/^[Yy].*/)
 
