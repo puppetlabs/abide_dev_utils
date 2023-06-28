@@ -31,6 +31,22 @@ module AbideDevUtils
       FWRITER.write_json(json_out, file: file) unless file.nil?
     end
 
+    def self.markdown(in_obj, console: false, file: nil, stringify: false, **_)
+      yaml_out = if in_obj.is_a? String
+                   in_obj
+                 else
+                   AbideDevUtils::Validate.hashable(in_obj)
+                   if stringify
+                     JSON.parse(JSON.generate(in_obj)).to_yaml
+                   else
+                     # Use object's #to_yaml method if it exists, convert to hash if not
+                     in_obj.respond_to?(:to_yaml) ? in_obj.to_yaml : in_obj.to_h.to_yaml
+                   end
+                 end
+      simple(yaml_out) if console
+      FWRITER.write_yaml(yaml_out, file: file) unless file.nil?
+    end
+
     def self.yaml(in_obj, console: false, file: nil, stringify: false, **_)
       yaml_out = if in_obj.is_a? String
                    in_obj

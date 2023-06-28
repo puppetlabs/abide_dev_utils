@@ -115,11 +115,16 @@ module Abide
         end
         options.on('-r', '--raw', 'Output the diff in raw format') { @data[:raw] = true }
         options.on('-q', '--quiet', 'Show no output in the terminal') { @data[:quiet] = false }
+        options.on('-m', '--markdown', 'Output the diff in Markdown') { @data[:markdown] = true }
       end
 
       def execute(file1, file2)
         diffreport = AbideDevUtils::XCCDF.diff(file1, file2, @data)
-        AbideDevUtils::Output.yaml(diffreport, console: @data.fetch(:quiet, true), file: @data.fetch(:outfile, nil))
+        if @data[:markdown]
+          AbideDevUtils::Output.markdown(diffreport, console: @data.fetch(:quiet, true), file: @data.fetch(:outfile, nil))
+        else
+          AbideDevUtils::Output.yaml(diffreport, console: @data.fetch(:quiet, true), file: @data.fetch(:outfile, nil))
+        end
       end
     end
   end
