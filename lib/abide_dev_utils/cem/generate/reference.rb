@@ -85,7 +85,7 @@ module AbideDevUtils
                 next if benchmark.framework == 'stig' && control.id_map_type != 'vulnid'
 
                 control_md = ControlMarkdown.new(control, @md, @strings, @module_name, benchmark.framework, opts: @opts)
-                control_md.generate!
+                control_md.generate! if control_md.verify_profile_and_level_selections
                 progress_bar.increment unless @opts[:quiet]
               rescue StandardError => e
                 raise "Failed to generate markdown for control #{control.id}. Original message: #{e.message}"
@@ -262,6 +262,40 @@ module AbideDevUtils
             resource_reference_builder
           end
 
+          # This function act as a filter for controls based on the profile and level selections.
+          # There are few scanarios that can happen:
+          # 1. If no selections are made for profile or level, then all profiles and levels of control will be selected.
+          # 2. If selections are made for profile, then only the selected profile and all levels of control will be selected.
+          # 3. If selections are made for level, then only the selected level and all profiles of control will be selected.
+          # This function adds in some runtime overhead because we're checking each control's level and profile which is
+          # what we're going to be doing later when building the level and profile markdown, but this is
+          # necessary to ensure that the reference.md is generated the way we want it to be.
+          def verify_profile_and_level_selections
+            return true if @opts[:select_profile].nil? && @opts[:select_level].nil?
+
+            if @opts[:select_profile].nil? && !@opts[:select_level].nil?
+              @control.levels.each do |level|
+                return true if control_level_filter(level)
+              end
+            elsif !@opts[:select_profile].nil? && @opts[:select_level].nil?
+              @control.profiles.each do |profile|
+                return true if control_profile_filter(profile)
+              end
+            elsif !@opts[:select_profile].nil? && !@opts[:select_level].nil?
+              contain_level = false
+              contain_profile = false
+
+              @control.levels.each do |level|
+                contain_level = true if control_level_filter(level)
+              end
+              @control.profiles.each do |profile|
+                contain_profile = true if control_profile_filter(profile)
+              end
+
+              return true if contain_level && contain_profile
+            end
+          end
+
           private
 
           def heading_builder
@@ -342,6 +376,10 @@ module AbideDevUtils
 
             @md.add_ul('Supported Levels:')
             @control.levels.each do |l|
+              unless @opts[:select_level].nil?
+                next unless control_level_filter(l)
+              end
+
               @md.add_ul(@md.code(l), indent: 1)
             end
           end
@@ -351,6 +389,10 @@ module AbideDevUtils
 
             @md.add_ul('Supported Profiles:')
             @control.profiles.each do |l|
+              unless @opts[:select_profile].nil?
+                next unless control_profile_filter(l)
+              end
+
               @md.add_ul(@md.code(l), indent: 1)
             end
           end
@@ -362,6 +404,18 @@ module AbideDevUtils
             @control.alternate_ids.each do |l|
               @md.add_ul(@md.code(l), indent: 1)
             end
+          end
+
+          # A filter function for profiles that each control supports.
+          # @param profile [String] the profile to filter
+          def control_profile_filter(profile)
+            @opts[:select_profile].include? profile
+          end
+
+          # A filter function for levels that each control supports.
+          # @param level [String] the level to filter
+          def control_level_filter(level)
+            @opts[:select_level].include? level
           end
 
           def dependent_controls_builder
