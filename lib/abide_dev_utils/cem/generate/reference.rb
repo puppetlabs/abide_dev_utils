@@ -299,9 +299,8 @@ module AbideDevUtils
                 @valid_profile << profile if select_control_profile(profile)
               end
 
-              contain_level = true unless @valid_level.empty?
-              contain_profile = true unless @valid_profile.empty?
-              return true if contain_level && contain_profile
+              # As long as there are valid profiles and levels for the control at this stage, all is good
+              !@valid_level.empty? && !@valid_profile.empty?
             end
           end
 
