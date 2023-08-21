@@ -248,6 +248,8 @@ module AbideDevUtils
             @framework = framework
             @formatter = formatter.nil? ? TypeExprValueFormatter : formatter
             @opts = opts
+            @valid_level = []
+            @valid_profile = []
             @control_data = {}
           end
 
@@ -275,23 +277,30 @@ module AbideDevUtils
 
             if @opts[:select_profile].nil? && !@opts[:select_level].nil?
               @control.levels.each do |level|
-                return true if control_level_filter(level)
+                @valid_level << level if select_control_level(level)
               end
+
+              return true unless @valid_level.empty?
             elsif !@opts[:select_profile].nil? && @opts[:select_level].nil?
               @control.profiles.each do |profile|
-                return true if control_profile_filter(profile)
+                @valid_profile << profile if select_control_profile(profile)
               end
+
+              return true unless @valid_profile.empty?
             elsif !@opts[:select_profile].nil? && !@opts[:select_level].nil?
               contain_level = false
               contain_profile = false
 
               @control.levels.each do |level|
-                contain_level = true if control_level_filter(level)
-              end
-              @control.profiles.each do |profile|
-                contain_profile = true if control_profile_filter(profile)
+                @valid_level << level if select_control_level(level)
               end
 
+              @control.profiles.each do |profile|
+                @valid_profile << profile if select_control_profile(profile)
+              end
+
+              contain_level = true unless @valid_level.empty?
+              contain_profile = true unless @valid_profile.empty?
               return true if contain_level && contain_profile
             end
           end
@@ -374,26 +383,36 @@ module AbideDevUtils
           def control_levels_builder
             return unless @control.levels
 
+            # @valid_level is populated in verify_profile_and_level_selections from the fact that we've given
+            # the generator a list of levels we want to use. If we didn't give it a list of levels, then we
+            # want to use all of the levels that the control supports from @control.
             @md.add_ul('Supported Levels:')
-            @control.levels.each do |l|
-              unless @opts[:select_level].nil?
-                next unless control_level_filter(l)
+            if @valid_level.empty?
+              @control.levels.each do |l|
+                @md.add_ul(@md.code(l), indent: 1)
               end
-
-              @md.add_ul(@md.code(l), indent: 1)
+            else
+              @valid_level.each do |l|
+                @md.add_ul(@md.code(l), indent: 1)
+              end
             end
           end
 
           def control_profiles_builder
             return unless @control.profiles
 
+            # @valid_profile is populated in verify_profile_and_level_selections from the fact that we've given
+            # the generator a list of profiles we want to use. If we didn't give it a list of profiles, then we
+            # want to use all of the profiles that the control supports from @control.
             @md.add_ul('Supported Profiles:')
-            @control.profiles.each do |l|
-              unless @opts[:select_profile].nil?
-                next unless control_profile_filter(l)
+            if @valid_profile.empty?
+              @control.profiles.each do |l|
+                @md.add_ul(@md.code(l), indent: 1)
               end
-
-              @md.add_ul(@md.code(l), indent: 1)
+            else
+              @valid_profile.each do |l|
+                @md.add_ul(@md.code(l), indent: 1)
+              end
             end
           end
 
@@ -406,15 +425,15 @@ module AbideDevUtils
             end
           end
 
-          # A filter function for profiles that each control supports.
+          # Function that returns true if the profile is in the list of profiles that we want to use.
           # @param profile [String] the profile to filter
-          def control_profile_filter(profile)
+          def select_control_profile(profile)
             @opts[:select_profile].include? profile
           end
 
-          # A filter function for levels that each control supports.
+          # Function that returns true if the level is in the list of levels that we want to use.
           # @param level [String] the level to filter
-          def control_level_filter(level)
+          def select_control_level(level)
             @opts[:select_level].include? level
           end
 
