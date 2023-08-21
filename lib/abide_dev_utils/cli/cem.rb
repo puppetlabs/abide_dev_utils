@@ -113,6 +113,12 @@ module Abide
         options.on('-s', '--strict', 'Fails if there are any errors') do
           @data[:strict] = true
         end
+        options.on('-p [PROFILE]', '--select-profile [PROFILE]', 'The list of profiles that the reference.md will use separated by commas') do |pr|
+          @data[:select_profile] = pr.split(',')
+        end
+        options.on('-l [LEVEL]', '--select-level [LEVEL]', 'The list of level that the reference.md will use separated by commas') do |l|
+          @data[:select_level] = l.split(',')
+        end
       end
 
       def execute

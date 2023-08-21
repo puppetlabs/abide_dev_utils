@@ -85,7 +85,7 @@ module AbideDevUtils
                 next if benchmark.framework == 'stig' && control.id_map_type != 'vulnid'
 
                 control_md = ControlMarkdown.new(control, @md, @strings, @module_name, benchmark.framework, opts: @opts)
-                control_md.generate!
+                control_md.generate! if control_md.verify_profile_and_level_selections
                 progress_bar.increment unless @opts[:quiet]
               rescue StandardError => e
                 raise "Failed to generate markdown for control #{control.id}. Original message: #{e.message}"
@@ -248,6 +248,8 @@ module AbideDevUtils
             @framework = framework
             @formatter = formatter.nil? ? TypeExprValueFormatter : formatter
             @opts = opts
+            @valid_level = []
+            @valid_profile = []
             @control_data = {}
           end
 
@@ -260,6 +262,46 @@ module AbideDevUtils
             control_alternate_ids_builder
             dependent_controls_builder
             resource_reference_builder
+          end
+
+          # This function act as a filter for controls based on the profile and level selections.
+          # There are few scanarios that can happen:
+          # 1. If no selections are made for profile or level, then all profiles and levels of control will be selected.
+          # 2. If selections are made for profile, then only the selected profile and all levels of control will be selected.
+          # 3. If selections are made for level, then only the selected level and all profiles of control will be selected.
+          # This function adds in some runtime overhead because we're checking each control's level and profile which is
+          # what we're going to be doing later when building the level and profile markdown, but this is
+          # necessary to ensure that the reference.md is generated the way we want it to be.
+          def verify_profile_and_level_selections
+            return true if @opts[:select_profile].nil? && @opts[:select_level].nil?
+
+            if @opts[:select_profile].nil? && !@opts[:select_level].nil?
+              @control.levels.each do |level|
+                @valid_level << level if select_control_level(level)
+              end
+
+              return true unless @valid_level.empty?
+            elsif !@opts[:select_profile].nil? && @opts[:select_level].nil?
+              @control.profiles.each do |profile|
+                @valid_profile << profile if select_control_profile(profile)
+              end
+
+              return true unless @valid_profile.empty?
+            elsif !@opts[:select_profile].nil? && !@opts[:select_level].nil?
+              contain_level = false
+              contain_profile = false
+
+              @control.levels.each do |level|
+                @valid_level << level if select_control_level(level)
+              end
+
+              @control.profiles.each do |profile|
+                @valid_profile << profile if select_control_profile(profile)
+              end
+
+              # As long as there are valid profiles and levels for the control at this stage, all is good
+              !@valid_level.empty? && !@valid_profile.empty?
+            end
           end
 
           private
@@ -340,18 +382,36 @@ module AbideDevUtils
           def control_levels_builder
             return unless @control.levels
 
+            # @valid_level is populated in verify_profile_and_level_selections from the fact that we've given
+            # the generator a list of levels we want to use. If we didn't give it a list of levels, then we
+            # want to use all of the levels that the control supports from @control.
             @md.add_ul('Supported Levels:')
-            @control.levels.each do |l|
-              @md.add_ul(@md.code(l), indent: 1)
+            if @valid_level.empty?
+              @control.levels.each do |l|
+                @md.add_ul(@md.code(l), indent: 1)
+              end
+            else
+              @valid_level.each do |l|
+                @md.add_ul(@md.code(l), indent: 1)
+              end
             end
           end
 
           def control_profiles_builder
             return unless @control.profiles
 
+            # @valid_profile is populated in verify_profile_and_level_selections from the fact that we've given
+            # the generator a list of profiles we want to use. If we didn't give it a list of profiles, then we
+            # want to use all of the profiles that the control supports from @control.
             @md.add_ul('Supported Profiles:')
-            @control.profiles.each do |l|
-              @md.add_ul(@md.code(l), indent: 1)
+            if @valid_profile.empty?
+              @control.profiles.each do |l|
+                @md.add_ul(@md.code(l), indent: 1)
+              end
+            else
+              @valid_profile.each do |l|
+                @md.add_ul(@md.code(l), indent: 1)
+              end
             end
           end
 
@@ -362,6 +422,18 @@ module AbideDevUtils
             @control.alternate_ids.each do |l|
               @md.add_ul(@md.code(l), indent: 1)
             end
+          end
+
+          # Function that returns true if the profile is in the list of profiles that we want to use.
+          # @param profile [String] the profile to filter
+          def select_control_profile(profile)
+            @opts[:select_profile].include? profile
+          end
+
+          # Function that returns true if the level is in the list of levels that we want to use.
+          # @param level [String] the level to filter
+          def select_control_level(level)
+            @opts[:select_level].include? level
           end
 
           def dependent_controls_builder
