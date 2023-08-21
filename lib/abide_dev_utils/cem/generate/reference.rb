@@ -288,9 +288,6 @@ module AbideDevUtils
 
               return true unless @valid_profile.empty?
             elsif !@opts[:select_profile].nil? && !@opts[:select_level].nil?
-              contain_level = false
-              contain_profile = false
-
               @control.levels.each do |level|
                 @valid_level << level if select_control_level(level)
               end
