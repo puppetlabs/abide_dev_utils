@@ -67,9 +67,8 @@ module AbideDevUtils
       fields = {}
       fields['summary'] = summary
       fields['project'] = project(client, project)
-      fields['reporter'] = myself(client)
       fields['issuetype'] = issuetype(client, 'Task')
-      fields['priority'] = priority(client, '6')
+      fields['priority'] = priority(client, '3')
       fields['description'] = description if description
       fields['labels'] = labels
       epic = issue(client, epic) if epic && !epic.is_a?(JIRA::Resource::Issue)
@@ -89,7 +88,6 @@ module AbideDevUtils
       fields = {
         'summary' => summary,
         'project' => project(client, project),
-        'reporter' => myself(client),
         'issuetype' => issuetype(client, 'Epic'),
         'customfield_10007' => summary, # Epic Name
       }
@@ -114,7 +112,6 @@ module AbideDevUtils
       fields['parent'] = issue
       fields['summary'] = summary
       fields['project'] = issue_fields['project']
-      fields['reporter'] = myself(client)
       fields['issuetype'] = issuetype(client, '5')
       fields['priority'] = issue_fields['priority']
       subtask = client.Issue.build
