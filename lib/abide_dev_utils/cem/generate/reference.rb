@@ -459,7 +459,7 @@ module AbideDevUtils
 
             @control.title.nil? ? out_str.unshift("    #{@control.id.dump}:") : out_str.unshift("    #{@control.title.dump}:")
             out_str.unshift('  control_configs:')
-            out_str.unshift("#{@module_name}::config:")
+            out_str.unshift("#{@module_name.split('-')[1]}::config:")
             @md.add_ul('Hiera Configuration Example:')
             @md.add_code_block(out_str.join("\n"), language: 'yaml')
           rescue StandardError => e
