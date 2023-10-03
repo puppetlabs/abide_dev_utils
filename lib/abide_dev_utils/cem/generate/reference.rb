@@ -382,7 +382,12 @@ module AbideDevUtils
             # @valid_level is populated in verify_profile_and_level_selections from the fact that we've given
             # the generator a list of levels we want to use. If we didn't give it a list of levels, then we
             # want to use all of the levels that the control supports from @control.
-            @md.add_ul('Supported Levels:')
+            if @framework == 'stig'
+              @md.add_ul('Supported MAC Levels:')
+            else
+              @md.add_ul('Supported Levels:')
+            end
+
             if @valid_level.empty?
               @control.levels.each do |l|
                 @md.add_ul(@md.code(l), indent: 1)
@@ -400,7 +405,12 @@ module AbideDevUtils
             # @valid_profile is populated in verify_profile_and_level_selections from the fact that we've given
             # the generator a list of profiles we want to use. If we didn't give it a list of profiles, then we
             # want to use all of the profiles that the control supports from @control.
-            @md.add_ul('Supported Profiles:')
+            if @framework == 'stig'
+              @md.add_ul('Supported Confidentiality:')
+            else
+              @md.add_ul('Supported Profiles:')
+            end
+
             if @valid_profile.empty?
               @control.profiles.each do |l|
                 @md.add_ul(@md.code(l), indent: 1)
@@ -413,7 +423,7 @@ module AbideDevUtils
           end
 
           def control_alternate_ids_builder
-            return if @framework == 'stig'
+            # return if @framework == 'stig'
 
             @md.add_ul('Alternate Config IDs:')
             @control.alternate_ids.each do |l|
