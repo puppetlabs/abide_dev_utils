@@ -1,14 +1,14 @@
 PATH
   remote: .
   specs:
-    abide_dev_utils (0.16.1)
+    abide_dev_utils (0.17.0)
       cmdparse (~> 3.0)
       facterdb (>= 1.21)
       google-cloud-storage (~> 1.34)
       hashdiff (~> 1.0)
       jira-ruby (~> 2.2)
       nokogiri (~> 1.13)
-      puppet (>= 6.23)
+      puppet (>= 7.0.0)
       puppet-strings (>= 2.7)
       ruby-progressbar (~> 1.11)
       selenium-webdriver (~> 4.0.0.beta4)
@@ -69,7 +69,7 @@ GEM
     faraday-http-cache (2.3.0)
       faraday (>= 0.8)
     faraday-net_http (2.0.3)
-    fast_gettext (1.8.0)
+    fast_gettext (2.3.0)
     fiber-local (1.0.0)
     gem-release (2.2.2)
     github_changelog_generator (1.16.4)
@@ -137,6 +137,8 @@ GEM
     multi_json (1.15.0)
     multipart-post (2.3.0)
     nio4r (2.5.8)
+    nokogiri (1.15.2-arm64-darwin)
+      racc (~> 1.4)
     nokogiri (1.15.2-x86_64-darwin)
       racc (~> 1.4)
     nokogiri (1.15.2-x86_64-linux)
@@ -265,6 +267,7 @@ GEM
     yard (0.9.34)
 
 PLATFORMS
+  arm64-darwin-22
   x86_64-darwin-19
   x86_64-darwin-20
   x86_64-linux
@@ -273,7 +276,7 @@ DEPENDENCIES
   abide_dev_utils!
   bundler
   console
-  fast_gettext (~> 1.8)
+  fast_gettext (>= 2.0)
   gem-release
   github_changelog_generator
   pry

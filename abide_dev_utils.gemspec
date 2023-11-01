@@ -34,7 +34,7 @@ Gem::Specification.new do |spec|
   # Prod dependencies
   spec.add_dependency 'nokogiri', '~> 1.13'
   spec.add_dependency 'cmdparse', '~> 3.0'
-  spec.add_dependency 'puppet', '>= 6.23'
+  spec.add_dependency 'puppet', '>= 7.0.0'
   spec.add_dependency 'puppet-strings', '>= 2.7'
   spec.add_dependency 'jira-ruby', '~> 2.2'
   spec.add_dependency 'ruby-progressbar', '~> 1.11'
@@ -56,7 +56,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'rubocop-ast', '~> 1.4'
   spec.add_development_dependency 'rubocop-performance', '~> 1.9'
   spec.add_development_dependency 'rubocop-i18n', '~> 3.0'
-  spec.add_development_dependency 'fast_gettext', '~> 1.8'
+  spec.add_development_dependency 'fast_gettext', '>= 2.0'
 
   # For more information and examples about making a new gem, checkout our
   # guide at: https://bundler.io/guides/creating_gem.html
