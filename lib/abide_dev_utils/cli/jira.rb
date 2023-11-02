@@ -6,9 +6,6 @@ require 'abide_dev_utils/jira'
 
 module Abide
   module CLI
-    CONFIG = AbideDevUtils::Config
-    JIRA = AbideDevUtils::Jira
-
     class JiraCommand < CmdParse::Command
       CMD_NAME = 'jira'
       CMD_SHORT = 'Commands related to Jira tickets'
@@ -38,11 +35,9 @@ module Abide
       end
 
       def execute
-        client = JIRA.client
-        myself = JIRA.myself(client)
-        return if myself.attrs['displayName'].empty?
+        return if AbideDevUtils::Jira.client.myself.attrs['displayName'].empty?
 
-        Abide::CLI::OUTPUT.simple("Successfully authenticated user #{myself.attrs['name']}!")
+        Abide::CLI::OUTPUT.simple("Successfully authenticated user #{AbideDevUtils::Jira.client.myself.attrs['displayName']}!")
       end
     end
 
@@ -59,8 +54,7 @@ module Abide
       end
 
       def execute(issue)
-        client = JIRA.client(options: {})
-        issue = client.Issue.find(issue)
+        issue = AbideDevUtils::Jira.client.find(:issue, issue)
         console = @data[:file].nil?
         out_json = issue.attrs.select { |_, v| !v.nil? || !v.empty? }
         Abide::CLI::OUTPUT.json(out_json, console: console, file: @data[:file])
@@ -83,13 +77,15 @@ module Abide
       end
 
       def execute(project, summary, *subtasks)
-        client = JIRA.client(options: {})
-        issue = JIRA.new_issue(client, project, summary)
+        issue = AbideDevUtils::Jira.client.create(:issue, project: project, summary: summary)
         Abide::CLI::OUTPUT.simple("Successfully created #{issue.attrs['key']}")
         return if subtasks.nil? || subtasks.empty?
 
         Abide::CLI::OUTPUT.simple('Creatings subtasks...')
-        JIRA.bulk_new_subtask(client, JIRA.issue(client, issue.attrs['key']), subtasks) unless subtasks.empty?
+        subtasks.each do |sum|
+          subtask = AbideDevUtils::Jira.client.create(:subtask, parent: issue, summary: sum)
+          Abide::CLI::OUTPUT.simple("Successfully created #{subtask.attrs['key']}")
+        end
       end
     end
 
@@ -107,11 +103,8 @@ module Abide
 
       def execute(report, project)
         Abide::CLI::VALIDATE.file(report)
-        @data[:dry_run] = false if @data[:dry_run].nil?
-        client = JIRA.client(options: {})
-        proj = JIRA.project(client, project)
         File.open(report) do |f|
-          JIRA.new_issues_from_coverage(client, proj, JSON.parse(f.read), dry_run: @data[:dry_run])
+          AbideDevUtils::Jira.new_issues_from_coverage(project, JSON.parse(f.read), dry_run: @data[:dry_run])
         end
       end
     end
@@ -127,14 +120,30 @@ module Abide
         argument_desc(PATH: 'An XCCDF file', PROJECT: 'A Jira project')
         options.on('-d', '--dry-run', 'Print to console instead of saving objects') { |_| @data[:dry_run] = true }
         options.on('-e [EPIC]', '--epic [EPIC]', 'If given, tasks will be created and assigned to this epic. Takes form <PROJECT>-<NUM>') { |e| @data[:epic] = e }
+        options.on('-l [LEVEL]', '--level [LEVEL]', 'Only create tasks for rules belonging to the matching level. Takes a string that is treated as RegExp') do |x|
+          @data[:level] = x
+        end
+        options.on('-p [PROFILE]', '--profile [PROFILE]', 'Only create tasks for rules belonging to the matching profile. Takes a string that is treated as RegExp') do |x|
+          @data[:profile] = x
+        end
       end
 
       def execute(path, project)
         Abide::CLI::VALIDATE.file(path)
-        @data[:dry_run] = false if @data[:dry_run].nil?
-        client = JIRA.client(options: {})
-        proj = JIRA.project(client, project)
-        JIRA.new_issues_from_xccdf(client, proj, path, epic: @data[:epic], dry_run: @data[:dry_run])
+        # Each control gets assigned labels based on the levels and profiles it supports.
+        # Those labels all take the form "level_<level>_<profile>". This allows us to
+        # filter the controls we want to create tasks for by level and profile.
+        @data[:label_include] = nil
+        @data[:label_include] = "level_#{@data[:level]}_" if @data[:level]
+        @data[:label_include] = "#{@data[:label_include]}#{@data[:profile]}" if @data[:profile]
+        Abide::CLI::Output.simple "Label include: #{@data[:label_include]}"
+        AbideDevUtils::Jira.new_issues_from_xccdf(
+          project,
+          path,
+          epic: @data[:epic],
+          dry_run: @data[:dry_run],
+          label_include: @data[:label_include],
+        )
       end
     end
 
@@ -167,17 +176,15 @@ module Abide
       def execute(path1, path2, project)
         Abide::CLI::VALIDATE.file(path1)
         Abide::CLI::VALIDATE.file(path2)
-        @data[:dry_run] = false if @data[:dry_run].nil?
-        client = JIRA.client(options: {})
-        proj = JIRA.project(client, project)
-        JIRA.new_issues_from_xccdf_diff(client,
-                                        proj,
-                                        path1,
-                                        path2,
-                                        epic: @data[:epic],
-                                        dry_run: @data[:dry_run],
-                                        auto_approve: @data[:auto_approve],
-                                        diff_opts: @data[:diff_opts])
+        AbideDevUtils::Jira.new_issues_from_xccdf_diff(
+          project,
+          path1,
+          path2,
+          epic: @data[:epic],
+          dry_run: @data[:dry_run],
+          auto_approve: @data[:auto_approve],
+          diff_opts: @data[:diff_opts],
+        )
       end
     end
   end
