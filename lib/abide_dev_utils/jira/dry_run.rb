@@ -12,19 +12,20 @@ module AbideDevUtils
               if !!@dry_run
                 case method_name
                 when %r{^create}
-                  AbideDevUtils::Output.simple("DRY RUN: #{self.class.name}##{method_name}(#{args[0]}, #{args[1].map { |k, v| "#{k}: #{v.inspect}" }.join(', ')})")
+                  AbideDevUtils::Output.simple("DRY RUN: #{self.class.name}##{method_name}(#{args[0]}, #{kwargs.map { |k, v| "#{k}: #{v.inspect}" }.join(', ')})")
                   sleep 0.1
                   return DummyIssue.new if args[0].match?(%r{^issue$})
                   return DummySubtask.new if args[0].match?(%r{^subtask$})
                 when %r{^find}
-                  AbideDevUtils::Output.simple("DRY RUN: #{self.class.name}##{method_name}(#{args[0]}, #{args[1].inspect})")
+                  AbideDevUtils::Output.simple("DRY RUN: #{self.class.name}##{method_name}(#{args[0]}, #{kwargs.inspect})")
                   return DummyIssue.new if args[0].match?(%r{^issue$})
                   return DummySubtask.new if args[0].match?(%r{^subtask$})
                   return DummyProject.new if args[0].match?(%r{^project$})
+                  return [] if args[0].match?(%r{^issues_by_jql$})
 
                   "Dummy #{args[0].capitalize}"
                 else
-                  AbideDevUtils::Output.simple("DRY RUN: #{self.class.name}##{method_name}(#{args.map(&:inspect).join(', ')})")
+                  AbideDevUtils::Output.simple("DRY RUN: #{self.class.name}##{method_name}(#{args.map(&:inspect).join(', ')}, #{kwargs.map { |k, v| "#{k}: #{v.inspect}" }.join(', ')})")
                 end
               else
                 super(*args, **kwargs)
@@ -77,7 +78,7 @@ module AbideDevUtils
       class Dummy
         attr_reader :dummy
 
-        def initialize
+        def initialize(*_args, **_kwargs)
           @dummy = true
         end
       end
@@ -85,10 +86,14 @@ module AbideDevUtils
       class DummyIssue < Dummy
         attr_reader :summary, :key
 
-        def initialize
+        def initialize(summary = 'Dummy Issue', key = 'DUM-111')
           super
-          @summary = 'Dummy Issue'
-          @key = 'DUM-111'
+          @summary = summary
+          @key = key
+        end
+
+        def labels
+          @labels ||= ['abide_dev_utils']
         end
 
         def attrs
@@ -102,10 +107,8 @@ module AbideDevUtils
       end
 
       class DummySubtask < DummyIssue
-        def initialize
-          super
-          @summary = 'Dummy Subtask'
-          @key = 'DUM-222'
+        def initialize(summary = 'Dummy Subtask', key = 'DUM-222')
+          super(summary, key)
         end
 
         def attrs
@@ -122,7 +125,7 @@ module AbideDevUtils
       class DummyProject < Dummy
         attr_reader :key, :issues
 
-        def initialize
+        def initialize(key = 'DUM', issues = [DummyIssue.new, DummySubtask.new])
           super
           @key = 'DUM'
           @issues = [DummyIssue.new, DummySubtask.new]

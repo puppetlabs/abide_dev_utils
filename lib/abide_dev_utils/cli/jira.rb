@@ -118,7 +118,12 @@ module Abide
         short_desc(CMD_SHORT)
         long_desc(CMD_LONG)
         argument_desc(PATH: 'An XCCDF file', PROJECT: 'A Jira project')
-        options.on('-d', '--dry-run', 'Print to console instead of saving objects') { |_| @data[:dry_run] = true }
+        options.on('-d', '--dry-run', 'Runs through mock issue creation. Useful for testing, but not reliable for knowing what exactly will be created. Use --explain for more accurate information.') do
+          @data[:dry_run] = true
+        end
+        options.on('-x', '--explain', 'Shows a report of all the controls that will and won\'t be created as issues, and why. DOES NOT create issues.') do
+          @data[:explain] = true
+        end
         options.on('-e [EPIC]', '--epic [EPIC]', 'If given, tasks will be created and assigned to this epic. Takes form <PROJECT>-<NUM>') { |e| @data[:epic] = e }
         options.on('-l [LEVEL]', '--level [LEVEL]', 'Only create tasks for rules belonging to the matching level. Takes a string that is treated as RegExp') do |x|
           @data[:level] = x
@@ -136,12 +141,13 @@ module Abide
         @data[:label_include] = nil
         @data[:label_include] = "level_#{@data[:level]}_" if @data[:level]
         @data[:label_include] = "#{@data[:label_include]}#{@data[:profile]}" if @data[:profile]
-        Abide::CLI::Output.simple "Label include: #{@data[:label_include]}"
+        Abide::CLI::OUTPUT.simple "Label include: #{@data[:label_include]}"
         AbideDevUtils::Jira.new_issues_from_xccdf(
           project,
           path,
           epic: @data[:epic],
           dry_run: @data[:dry_run],
+          explain: @data[:explain],
           label_include: @data[:label_include],
         )
       end

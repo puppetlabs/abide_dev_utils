@@ -43,7 +43,9 @@ module AbideDevUtils
       end
     end
 
-    def self.new_issues_from_xccdf(project, xccdf_path, epic: nil, dry_run: false, label_include: nil)
+    ToCreateData = Struct.new(:summary, :labels, :should_create, :metadata)
+
+    def self.new_issues_from_xccdf(project, xccdf_path, epic: nil, dry_run: false, explain: false, label_include: nil)
       client(dry_run: dry_run) # Initializes the client if needed
       i_attrs = client.helper.all_project_issues_attrs(project)
       xccdf = AbideDevUtils::XCCDF::Benchmark.new(xccdf_path)
@@ -64,40 +66,110 @@ module AbideDevUtils
              end
       # Now we need to find out which issues we need to create for the benchmark
       # The profiles that the control belongs to will be added as an issue label
-      to_create = {}
+      to_create = []
       summaries_from_xccdf(xccdf).each do |profile_summary, control_summaries|
-        control_summaries.reject { |s| client.helper.summary_exist?(s, i_attrs) }.each do |control_summary|
-          if to_create.key?(control_summary)
-            to_create[control_summary] << profile_summary.split.join('_').downcase
+        control_summaries.each do |control_summary|
+          existing_to_create = to_create.find { |tc| tc.summary == control_summary }
+          if existing_to_create
+            existing_to_create.labels << profile_summary.split.join('_').downcase
           else
-            to_create[control_summary] = [profile_summary.split.join('_').downcase]
+            new_to_create = ToCreateData.new(
+              summary: control_summary,
+              labels: [profile_summary.split.join('_').downcase],
+              should_create: true,
+              metadata: {
+                epic_key: epic.key,
+                project: project,
+              },
+            )
+            to_create << new_to_create
           end
         end
       end
 
-      # If we have a label_include, we need to filter out any controls that don't have that label
-      unless label_include.nil?
-        to_create = to_create.select do |_control_summary, labels|
-          labels.any? { |l| l.match?(label_include) }
-        end
-      end
+      final_to_create = filter_to_create(to_create, label_include, project, epic)
 
-      unless AbideDevUtils::Prompt.yes_no("#{dr_prefix(dry_run)}Create #{to_create.keys.count} new Jira issues?")
+      return explain_this(to_create) if explain
+
+      unless AbideDevUtils::Prompt.yes_no("#{dr_prefix(dry_run)}Create #{final_to_create.count} new Jira issues?")
         AbideDevUtils::Output.simple("#{dr_prefix(dry_run)}Aborting")
         exit(0)
       end
 
       progress = AbideDevUtils::Output.progress(title: "#{dr_prefix(dry_run)}Creating issues",
-                                                total: to_create.keys.count,
+                                                total: final_to_create.count,
                                                 format: PROGRESS_BAR_FORMAT)
-      to_create.each do |control_summary, labels|
-        abrev = control_summary.length > 40 ? control_summary[0..60] : control_summary
+      final_to_create.each do |tc|
+        abrev = tc.summary.length > 40 ? tc.summary[0..60] : tc.summary
         progress.log("#{dr_prefix(dry_run)}Creating #{abrev}...")
-        client.create(:issue, project: project, summary: control_summary, labels: labels, epic_link: epic)
+        client.create(:issue, project: project, summary: tc.summary, labels: tc.labels, epic_link: epic)
         progress.increment
       end
       progress.finish
       AbideDevUtils::Output.simple("#{dr_prefix(dry_run)}Done creating tasks in Epic '#{epic.summary}'")
+    end
+
+    def self.filter_to_create(to_create, label_include, project, epic)
+      not_already_exists = filter_already_exists(to_create, project, epic)
+      AbideDevUtils::Output.simple(
+        "Filtered out #{to_create.count - not_already_exists.count} issues that already existed",
+      )
+      only_label_include = filter_label_include(not_already_exists, label_include)
+      AbideDevUtils::Output.simple(
+        "Filtered out #{not_already_exists.count - only_label_include.count} issues that didn't include the label #{label_include}",
+      )
+      only_label_include
+    end
+
+    def self.filter_already_exists(to_create, project, epic)
+      AbideDevUtils::Output.simple('Checking if issues already exist...')
+      project = client.find(:project, project)
+      epic = client.find(:issue, epic)
+      issues = client.find(:issues_by_jql, "project = \"#{project.key}\" AND 'Epic Link' = \"#{epic.key}\"")
+      to_create.reject do |tc|
+        if issues.any? { |i| i.summary == tc.summary }
+          tc.metadata[:already_exists] = true
+          tc.should_create = false
+          true
+        else
+          tc.metadata[:already_exists] = false
+          false
+        end
+      end
+    end
+
+    # If we have a label_include, we need to filter out any controls that don't have that label
+    def self.filter_label_include(to_create, label_include)
+      return to_create if label_include.nil?
+
+      AbideDevUtils::Output.simple("Filtering out controls that don't match label include: #{label_include}")
+      to_create.select do |tc|
+        if tc.labels.any? { |l| l.match?(label_include) }
+          tc.metadata[:label_include] = true
+          true
+        else
+          tc.metadata[:label_include] = false
+          tc.should_create = false
+          false
+        end
+      end
+    end
+
+    def self.explain_this(to_create)
+      should_create = to_create.select(&:should_create)
+      should_not_create = to_create.reject(&:should_create)
+      AbideDevUtils::Output.simple(AbideDevUtils::Output.simple_section_separator('EXPLAIN'))
+      AbideDevUtils::Output.simple("Will create #{should_create.count} issues")
+      AbideDevUtils::Output.simple("Will not create #{should_not_create.count} issues")
+      AbideDevUtils::Output.simple(AbideDevUtils::Output.simple_section_separator('WILL CREATE'))
+      should_create.each do |tc|
+        AbideDevUtils::Output.simple("\"#{tc.summary}\"; labels: #{tc.labels}; metadata: #{tc.metadata}")
+      end
+      AbideDevUtils::Output.simple(AbideDevUtils::Output.simple_section_separator('WILL NOT CREATE'))
+      should_not_create.each do |tc|
+        AbideDevUtils::Output.simple("\"#{tc.summary}\"; labels: #{tc.labels}; metadata: #{tc.metadata}")
+      end
+      exit(0)
     end
 
     def self.new_issues_from_xccdf_diff(project, xccdf1_path, xccdf2_path, epic: nil, dry_run: false, auto_approve: false, diff_opts: {})
