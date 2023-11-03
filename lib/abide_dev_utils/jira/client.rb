@@ -47,6 +47,10 @@ module AbideDevUtils
         @helper ||= Helper.new(self, dry_run: @dry_run)
       end
 
+      def translate_issue_custom_field(name)
+        IssueBuilder::CUSTOM_FIELDS[name] || IssueBuilder::CUSTOM_FIELDS.invert[name]
+      end
+
       private
 
       def client

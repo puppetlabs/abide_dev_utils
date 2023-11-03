@@ -32,6 +32,12 @@ module AbideDevUtils
         iss
       end
 
+      # @param jql [String] The JQL query
+      # @return [Array<JIRA::Resource::Issue>]
+      def issues_by_jql(jql)
+        client.Issue.jql(jql, max_results: 1000)
+      end
+
       # @param id [String] The issuetype ID or name
       def issuetype(id)
         return id if id.is_a?(client.Issuetype.target_class)

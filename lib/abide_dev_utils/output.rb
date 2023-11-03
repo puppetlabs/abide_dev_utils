@@ -10,6 +10,14 @@ require 'abide_dev_utils/files'
 module AbideDevUtils
   module Output
     FWRITER = AbideDevUtils::Files::Writer.new
+    def self.simple_section_separator(section_text, sepchar: '#', width: 60, **_)
+      section_text = section_text.to_s
+      section_text = section_text[0..width - 4] if section_text.length > width
+      section_text = " #{section_text} "
+      section_sep_line = sepchar * width
+      [section_sep_line, section_text.center(width, sepchar), section_sep_line].join("\n")
+    end
+
     def self.simple(msg, stream: $stdout, **_)
       case msg
       when Hash
