@@ -1,25 +1,30 @@
 # frozen_string_literal: true
 
 require 'io/console'
+require_relative 'output'
 
 module AbideDevUtils
   module Prompt
-    def self.yes_no(msg, auto_approve: false)
-      return true if auto_approve
+    def self.yes_no(msg, auto_approve: false, stream: $stdout)
+      prompt_msg = "#{msg} (Y/n): "
+      if auto_approve
+        AbideDevUtils::Output.simple("#{prompt_msg}Y", stream: stream)
+        return true
+      end
 
-      print "#{msg} (Y/n): "
+      AbideDevUtils::Output.print(prompt_msg, stream: stream)
       return true if $stdin.cooked(&:gets).match?(/^[Yy].*/)
 
       false
     end
 
-    def self.single_line(msg)
-      print "#{msg}: "
+    def self.single_line(msg, stream: $stdout)
+      AbideDevUtils::Output.print("#{msg}: ", stream: stream)
       $stdin.cooked(&:gets).chomp
     end
 
-    def self.username
-      print 'Username: '
+    def self.username(stream: $stdout)
+      AbideDevUtils::Output.print('Username: ', stream: stream)
       $stdin.cooked(&:gets).chomp
     end
 

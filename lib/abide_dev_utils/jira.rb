@@ -172,18 +172,18 @@ module AbideDevUtils
       exit(0)
     end
 
-    def self.new_issues_from_xccdf_diff(project, xccdf1_path, xccdf2_path, epic: nil, dry_run: false, auto_approve: false, diff_opts: {})
+    def self.new_issues_from_xccdf_diff(project, xccdf1_path, xccdf2_path, epic: nil, dry_run: false, print_only: false, auto_approve: false, diff_opts: {})
       require 'abide_dev_utils/xccdf/diff'
       diff = AbideDevUtils::XCCDF::Diff::BenchmarkDiff.new(xccdf1_path, xccdf2_path, diff_opts)
       client(dry_run: dry_run) # Initializes the client if needed
       i_attrs = client.helper.all_project_issues_attrs(project)
       # We need to get the actual epic Issue object, or create it if it doesn't exist
       epic = if epic.nil?
-               new_epic_summary = "#{COV_PARENT_SUMMARY_PREFIX}#{xccdf.title}"
+               new_epic_summary = "#{COV_PARENT_SUMMARY_PREFIX}#{diff.this.title}: #{diff.this.version} -> #{diff.other.version}"
                if client.helper.summary_exist?(new_epic_summary, i_attrs)
                  client.find(:issue, new_epic_summary)
                else
-                 unless AbideDevUtils::Prompt.yes_no("#{dr_prefix(dry_run)}Create new epic '#{new_epic_summary}'?")
+                 unless AbideDevUtils::Prompt.yes_no("#{dr_prefix(dry_run)}Create new epic '#{new_epic_summary}'?", auto_approve: auto_approve)
                    AbideDevUtils::Output.simple("#{dr_prefix(dry_run)}Aborting")
                    exit(0)
                  end
@@ -202,30 +202,57 @@ module AbideDevUtils
             sum = "Add rule #{v[:number]} - #{v[:title]}"
             sum = "#{sum[0..60]}..." if sum.length > 60
             to_create[sum] = <<~DESC
-              Rule #{v[:number]} - #{v[:title]} is added with #{diff.other.title} #{diff.other.version}
+              Rule #{v[:number]} - #{v[:title]} is added
+
+              * From:
+                * Benchmark: #{diff.this.title} #{diff.this.version}
+              * To:
+                * Benchmark: #{diff.other.title} #{diff.other.version}
             DESC
           when :removed
             sum = "Remove rule #{v[:number]} - #{v[:title]}"
             sum = "#{sum[0..60]}..." if sum.length > 60
             to_create[sum] = <<~DESC
-              Rule #{v[:number]} - #{v[:title]} is removed from #{diff.this.title} #{diff.this.version}
+              Remove rule #{v[:number]} - #{v[:title]}
+
+              * From:
+                * Benchmark: #{diff.this.title} #{diff.this.version}
+              * To:
+                * Benchmark: #{diff.other.title} #{diff.other.version}
             DESC
           else
-            sum = "Update rule \"#{v[:from]}\""
+            sum = "Changed rule \"#{v[:from]}\""
             sum = "#{sum[0..60]}..." if sum.length > 60
             to_create[sum] = <<~DESC
-              Rule #{v[:from]} is updated in #{diff.other.title} #{diff.other.version}:
-              #{v[:changes].collect { |k, v| "#{k}: #{v}" }.join("\n")}
+              #{v[:changes].collect { |ck, cv| "Property \"#{ck}\" changed: \"#{cv.last}\" changed to \"#{cv.first}\"" }.join("\n  ")}
+
+              * From:
+                * Rule: #{v[:from]}
+                * Benchmark: #{diff.this.title} #{diff.this.version}
+              * To:
+                * Rule: #{v[:to]}
+                * Benchmark: #{diff.other.title} #{diff.other.version}
             DESC
           end
         end
       end
       approved_create = {}
       to_create.each do |summary, description|
-        if AbideDevUtils::Prompt.yes_no("#{dr_prefix(dry_run)}Create new issue '#{summary}' with description:\n#{description}", auto_approve: auto_approve)
+        section_header = "#{dr_prefix(dry_run)}NEW ISSUE"
+        prompt_msg = <<~PROMPT
+          #{AbideDevUtils::Output.simple_section_separator(section_header, width: 90)}
+          Title: '#{summary}'
+          Description:
+          #{description}
+        PROMPT
+        if print_only
+          AbideDevUtils::Output.simple(prompt_msg)
+        elsif AbideDevUtils::Prompt.yes_no("#{prompt_msg.strip}\nCreate?", auto_approve: auto_approve)
           approved_create[summary] = description
         end
       end
+      return if approved_create.empty?
+
       AbideDevUtils::Output.simple("#{dr_prefix(dry_run)}Creating #{approved_create.keys.count} new Jira issues")
       progress = AbideDevUtils::Output.progress(title: "#{dr_prefix(dry_run)}Creating issues",
                                                 total: approved_create.keys.count,

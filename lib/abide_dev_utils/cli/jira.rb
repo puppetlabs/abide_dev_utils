@@ -163,6 +163,11 @@ module Abide
         long_desc(CMD_LONG)
         argument_desc(PATH1: 'An XCCDF file', PATH2: 'An XCCDF file', PROJECT: 'A Jira project')
         options.on('-d', '--dry-run', 'Print to console instead of saving objects') { |_| @data[:dry_run] = true }
+        options.on('-z', '--print-only', 'Prints a list of issues that would be created. Implies dry-run, and auto-approve, but less verbose than --dry-run.') do
+          @data[:print_only] = true
+          @data[:dry_run] = true
+          @data[:auto_approve] = true
+        end
         options.on('-y', '--yes', 'Automatically approve all yes / no prompts') { |_| @data[:auto_approve] = true }
         options.on('-e [EPIC]', '--epic [EPIC]', 'If given, tasks will be created and assigned to this epic. Takes form <PROJECT>-<NUM>') { |e| @data[:epic] = e }
         options.on('-p [PROFILE]', '--profile', 'Only diff rules belonging to the matching profile. Takes a string that is treated as RegExp') do |x|
@@ -188,8 +193,9 @@ module Abide
           path2,
           epic: @data[:epic],
           dry_run: @data[:dry_run],
+          print_only: @data[:print_only],
           auto_approve: @data[:auto_approve],
-          diff_opts: @data[:diff_opts],
+          diff_opts: @data[:diff_opts] || {},
         )
       end
     end

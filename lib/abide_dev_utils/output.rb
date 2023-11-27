@@ -27,6 +27,10 @@ module AbideDevUtils
       end
     end
 
+    def self.print(msg, stream: $stdout, **_)
+      stream.print msg
+    end
+
     def self.text(msg, console: false, file: nil, **_)
       simple(msg) if console
       FWRITER.write_text(msg, file: file) unless file.nil?
