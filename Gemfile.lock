@@ -264,7 +264,7 @@ GEM
     unicode-display_width (2.1.0)
     version_gem (1.1.2)
     webrick (1.8.1)
-    yard (0.9.35)
+    yard (0.9.36)
 
 PLATFORMS
   arm64-darwin-22
