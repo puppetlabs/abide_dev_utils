@@ -21,6 +21,7 @@ Gem::Specification.new do |spec|
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = spec.homepage
   spec.metadata["changelog_uri"] = spec.homepage
+  spec.metadata['rubygems_mfa_required'] = 'true'
 
   # Specify which files should be added to the gem when it is released.
   # The `git ls-files -z` loads the files in the RubyGem that have been added into git.
@@ -42,6 +43,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'google-cloud-storage', '~> 1.34'
   spec.add_dependency 'hashdiff', '~> 1.0'
   spec.add_dependency 'facterdb', '>= 1.21'
+  spec.add_dependency 'metadata-json-lint', '~> 4.0'
 
   # Dev dependencies
   spec.add_development_dependency 'bundler'
@@ -57,7 +59,4 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'rubocop-performance', '~> 1.9'
   spec.add_development_dependency 'rubocop-i18n', '~> 3.0'
   spec.add_development_dependency 'fast_gettext', '>= 2.0'
-
-  # For more information and examples about making a new gem, checkout our
-  # guide at: https://bundler.io/guides/creating_gem.html
 end

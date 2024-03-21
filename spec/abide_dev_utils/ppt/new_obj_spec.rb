@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'tempfile'
-require 'abide_dev_utils'
 
 def new_obj_cls_stubs(test_erb)
   allow(Dir).to receive(:exist?).and_call_original

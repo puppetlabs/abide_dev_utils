@@ -23,7 +23,7 @@ module Abide
     class XccdfGenMapCommand < AbideCommand
       CMD_NAME = 'gen-map'
       CMD_SHORT = 'Generates mappings from XCCDF files'
-      CMD_LONG = 'Generates mappings for CEM modules from 1 or more XCCDF files as YAML'
+      CMD_LONG = 'Generates mappings for SCE modules from 1 or more XCCDF files as YAML'
       CMD_XCCDF_FILES_ARG = 'One or more paths to XCCDF files'
       def initialize
         super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
@@ -31,7 +31,8 @@ module Abide
         options.on('-b [TYPE]', '--benchmark-type [TYPE]', 'XCCDF Benchmark type CIS by default') do |b|
           @data[:type] = b
         end
-        options.on('-d [DIR]', '--files-output-directory [DIR]', 'Directory to save files data/mappings by default') do |d|
+        options.on('-d [DIR]', '--files-output-directory [DIR]',
+                   'Directory to save files data/mappings by default') do |d|
           @data[:dir] = d
         end
         options.on('-V', '--version-output-dir', 'If saving to a directory, version the output directory') do
@@ -104,13 +105,16 @@ module Abide
         super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
         argument_desc(FILE1: CMD_FILE1_ARG, FILE2: CMD_FILE2_ARG)
         options.on('-o [PATH]', '--out-file', 'Save the report as a yaml file') { |x| @data[:outfile] = x }
-        options.on('-p [PROFILE]', '--profile', 'Only diff rules belonging to the matching profile. Takes a string that is treated as RegExp') do |x|
+        options.on('-p [PROFILE]', '--profile',
+                   'Only diff rules belonging to the matching profile. Takes a string that is treated as RegExp') do |x|
           @data[:profile] = x
         end
-        options.on('-l [LEVEL]', '--level', 'Only diff rules belonging to the matching level. Takes a string that is treated as RegExp') do |x|
+        options.on('-l [LEVEL]', '--level',
+                   'Only diff rules belonging to the matching level. Takes a string that is treated as RegExp') do |x|
           @data[:level] = x
         end
-        options.on('-i [PROPS]', '--ignore-changed-properties', 'Ignore changes to specified properties. Takes a comma-separated list.') do |x|
+        options.on('-i [PROPS]', '--ignore-changed-properties',
+                   'Ignore changes to specified properties. Takes a comma-separated list.') do |x|
           @data[:ignore_changed_properties] = x.split(',')
         end
         options.on('-r', '--raw', 'Output the diff in raw format') { @data[:raw] = true }

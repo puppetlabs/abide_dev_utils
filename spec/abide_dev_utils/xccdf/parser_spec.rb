@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'abide_dev_utils/xccdf/parser'
+# require 'abide_dev_utils/xccdf/parser'
 require 'spec_helper'
 
 RSpec.describe AbideDevUtils::XCCDF::Parser do

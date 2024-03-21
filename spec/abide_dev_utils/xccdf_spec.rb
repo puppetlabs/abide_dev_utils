@@ -2,8 +2,8 @@
 
 require 'pathname'
 require 'yaml'
-require 'abide_dev_utils/xccdf'
-require 'abide_dev_utils/errors'
+# require 'abide_dev_utils/xccdf'
+# require 'abide_dev_utils/errors'
 require 'spec_helper'
 
 spec_dir = Pathname.new(__dir__).parent
@@ -40,12 +40,12 @@ RSpec.describe 'AbideDevUtils::XCCDF' do
 
   it 'Creates control map from Windows XCCDF' do
     opts = { console: true, type: 'cis', parent_key_prefix: '' }
-    expect { AbideDevUtils::XCCDF.gen_map(windows_xccdf, opts)}.not_to raise_error
+    expect { AbideDevUtils::XCCDF.gen_map(windows_xccdf, **opts) }.not_to raise_error
   end
 
   it 'Creates control map from Linux XCCDF' do
     opts = { console: true, type: 'cis', parent_key_prefix: '' }
-    expect { AbideDevUtils::XCCDF.gen_map(linux_xccdf, opts)}.not_to raise_error
+    expect { AbideDevUtils::XCCDF.gen_map(linux_xccdf, **opts) }.not_to raise_error
   end
 
   it 'raises FileNotFoundError when creating object Benchmark object with bad file path' do
@@ -75,7 +75,7 @@ RSpec.describe 'AbideDevUtils::XCCDF' do
         end
 
         it 'returns and empty array on bad xpath query' do
-          expect(benchmark.xpath('fake/xpath').empty?).to eq true
+          expect(benchmark.xpath('fake/xpath').empty?).to be true
         end
 
         it 'correctly trims non-alphanumeric character at end of string' do

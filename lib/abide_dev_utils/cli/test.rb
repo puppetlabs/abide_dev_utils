@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require 'abide_dev_utils/cli/abstract'
+
 module Abide
   module CLI
-    class TestCommand < CmdParse::Command
+    class TestCommand < AbideCommand
       CMD_NAME = 'test'
       CMD_SHORT = 'Run test suites against a Puppet module'
       CMD_LONG = 'Run various test suites against a Puppet module. Requires PDK to be installed.'
@@ -10,16 +12,25 @@ module Abide
       CMD_LIT_BASE = 'bundle exec rake'
 
       def initialize
-        super(CMD_NAME, takes_commands: false)
-        short_desc(CMD_SHORT)
-        long_desc(CMD_LONG)
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false, deprecated: true)
         argument_desc(SUITE: 'Test suite to run [all, validate, unit, limus]')
-        options.on('-p', '--puppet-version', 'Set Puppet version for unit tests. Takes SemVer string') { |p| @data[:puppet] = p }
+        options.on('-p', '--puppet-version', 'Set Puppet version for unit tests. Takes SemVer string') do |p|
+          @data[:puppet] = p
+        end
         options.on('-e', '--pe-version', 'Set PE version for unit tests. Takes SemVer String') { |e| @data[:pe] = e }
-        options.on('-n', '--no-teardown', 'Do not tear down Litmus machines after tests') { |_| @data[:no_teardown] = true }
-        options.on('-c [puppet[67]]', '--collection [puppet[67]]', 'Puppet collection to use with litmus tests') { |c| @data[:collection] = c }
-        options.on('-l [LIST]', '--provision-list [LIST]', 'Set the provision list for Litmus') { |l| @data[:provision_list] = l }
-        options.on('-M [PATH]', '--module-dir [PATH]', 'Set a different directory as the module dir (defaults to current dir)') { |m| @data[:module_dir] = m }
+        options.on('-n', '--no-teardown', 'Do not tear down Litmus machines after tests') do |_|
+          @data[:no_teardown] = true
+        end
+        options.on('-c [puppet[67]]', '--collection [puppet[67]]', 'Puppet collection to use with litmus tests') do |c|
+          @data[:collection] = c
+        end
+        options.on('-l [LIST]', '--provision-list [LIST]', 'Set the provision list for Litmus') do |l|
+          @data[:provision_list] = l
+        end
+        options.on('-M [PATH]', '--module-dir [PATH]',
+                   'Set a different directory as the module dir (defaults to current dir)') do |m|
+          @data[:module_dir] = m
+        end
         # Declare and setup commands
         @validate = ['validate', '--parallel']
         @unit = ['test', 'unit', '--parallel']

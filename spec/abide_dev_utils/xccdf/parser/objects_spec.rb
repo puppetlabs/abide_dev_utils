@@ -1,9 +1,8 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
-require 'abide_dev_utils/xccdf/parser'
-require 'abide_dev_utils/xccdf/parser/objects'
-require 'pry'
+# require 'abide_dev_utils/xccdf/parser'
+# require 'abide_dev_utils/xccdf/parser/objects'
 
 RSpec.describe AbideDevUtils::XCCDF::Parser::Objects do
   let(:file_path) { test_xccdf_files.find { |f| f.end_with?('v1.0.0-xccdf.xml') } }
@@ -13,7 +12,7 @@ RSpec.describe AbideDevUtils::XCCDF::Parser::Objects do
     describe 'class methods' do
       describe '#xpath' do
         it 'returns the xpath to the benchmark' do
-          expect(described_class.xpath).to eq('xccdf:Benchmark')
+          expect(described_class.xpath).to eq('Benchmark')
         end
       end
     end
