@@ -2,7 +2,7 @@
 
 require 'cmdparse'
 require 'abide_dev_utils/version'
-require 'abide_dev_utils/cli/cem'
+require 'abide_dev_utils/cli/sce'
 require 'abide_dev_utils/constants'
 require 'abide_dev_utils/cli/comply'
 require 'abide_dev_utils/cli/puppet'
@@ -15,6 +15,7 @@ module Abide
     include AbideDevUtils::CliConstants
     ROOT_CMD_NAME = 'abide'
     ROOT_CMD_BANNER = 'Developer tools for Abide'
+    DEPRECATED_COMMANDS = %w[comply test].freeze
 
     def self.new_parser
       parser = CmdParse::CommandParser.new(handle_exceptions: true)
@@ -23,7 +24,7 @@ module Abide
       parser.main_options.banner = ROOT_CMD_BANNER
       parser.add_command(CmdParse::HelpCommand.new, default: true)
       parser.add_command(CmdParse::VersionCommand.new(add_switches: true))
-      parser.add_command(CemCommand.new)
+      parser.add_command(SceCommand.new)
       parser.add_command(ComplyCommand.new)
       parser.add_command(PuppetCommand.new)
       parser.add_command(XccdfCommand.new)
@@ -32,9 +33,9 @@ module Abide
       parser
     end
 
-    def self.execute
+    def self.execute(argv = ARGV)
       parser = new_parser
-      parser.parse
+      parser.parse(argv)
     end
   end
 end

@@ -10,7 +10,7 @@ module Abide
       CMD_SHORT = 'Commands related to Puppet Comply'
       CMD_LONG = 'Namespace for commands related to Puppet Comply'
       def initialize
-        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: true)
+        super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: true, deprecated: true)
         add_command(ComplyReportCommand.new)
         add_command(ComplyCompareReportCommand.new)
       end
@@ -106,7 +106,10 @@ module Abide
         super(CMD_NAME, CMD_SHORT, CMD_LONG, takes_commands: false)
         argument_desc(REPORT_A: CMD_REPORT_A, REPORT_B: CMD_REPORT_B)
         options.on('-u', '--upload-new', 'If you want to upload the new scan report') { @data[:upload] = true }
-        options.on('-s [STORAGE]', '--remote-storage [STORAGE]', 'Remote storage to upload the report to. (Only supports "gcloud")') { |x| @data[:remote_storage] = x }
+        options.on('-s [STORAGE]', '--remote-storage [STORAGE]',
+                   'Remote storage to upload the report to. (Only supports "gcloud")') do |x|
+          @data[:remote_storage] = x
+        end
         options.on('-r [NAME]', '--name [NAME]', 'The name to upload the report as') { |x| @data[:report_name] = x }
       end
 

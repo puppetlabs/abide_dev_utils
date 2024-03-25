@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+### THIS CODE IS CURRENTLY UNSUPPORTED ###
+
 require 'json'
 require 'yaml'
 require 'selenium-webdriver'
@@ -208,15 +210,13 @@ module AbideDevUtils
       end
 
       def page_source
-        File.open(File.join(file_dir, "comply_error_#{Time.now.to_i}.txt"), 'w') { |f| f.write(driver.page_source) }
+        File.write(File.join(file_dir, "comply_error_#{Time.now.to_i}.txt"), driver.page_source)
       rescue Errno::ENOENT
         save_default = prompt.yes_no(
           "Directory #{file_dir} does not exist. Save page source to current directory?"
         )
         if save_default
-          File.open(File.join(File.expand_path('.'), "comply_error_#{Time.now.to_i}.html"), 'w') do |f|
-            f.write(driver.page_source)
-          end
+          File.write(File.join(File.expand_path('.'), "comply_error_#{Time.now.to_i}.html"), driver.page_source)
         end
       end
 
@@ -352,9 +352,7 @@ module AbideDevUtils
             if status.nil? || status.include?(chk_objs[1].downcase)
               name_parts = chk_objs[0].match(/^([0-9.]+) (.+)$/)
               key = normalize_cis_rec_name(name_parts[2])
-              unless report['scan_results'].key?(chk_objs[1])
-                report['scan_results'][chk_objs[1]] = {}
-              end
+              report['scan_results'][chk_objs[1]] = {} unless report['scan_results'].key?(chk_objs[1])
               report['scan_results'][chk_objs[1]][key] = {
                 'name' => name_parts[2].chomp,
                 'number' => name_parts[1].chomp
@@ -481,7 +479,7 @@ module AbideDevUtils
       def diff(other)
         diff = {}
         DIFF_PROPERTIES.each do |prop|
-          diff[prop] = send("#{prop.to_s}_equal?".to_sym, other.send(prop)) ? {} : property_diff(prop, other)
+          diff[prop] = send("#{prop}_equal?".to_sym, other.send(prop)) ? {} : property_diff(prop, other)
         end
         diff
       end
@@ -490,7 +488,7 @@ module AbideDevUtils
 
       def create_equality_methods
         DIFF_PROPERTIES.each do |prop|
-          meth_name = "#{prop.to_s}_equal?"
+          meth_name = "#{prop}_equal?"
           self.class.define_method(meth_name) do |other|
             property_equal?(prop, other)
           end

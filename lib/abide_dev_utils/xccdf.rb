@@ -10,13 +10,11 @@ require 'abide_dev_utils/output'
 module AbideDevUtils
   # Contains modules and classes for working with XCCDF files
   module XCCDF
-    # Generate map for CEM
+    # Generate map for SCE
     def self.gen_map(xccdf_file, **opts)
       type = opts.fetch(:type, 'cis')
       case type.downcase
-      when 'cis'
-        Benchmark.new(xccdf_file).gen_map(**opts)
-      when 'stig'
+      when /cis|stig/
         Benchmark.new(xccdf_file).gen_map(**opts)
       else
         raise AbideDevUtils::Errors::UnsupportedXCCDFError, "XCCDF type #{type} is unsupported!"
@@ -144,12 +142,11 @@ module AbideDevUtils
           # STIG control
           vuln_id = mdata[4]
           group = @benchmark.xpath("Group[@id='#{vuln_id}']")
-          if group.xpath('Rule').length != 1
-            raise AbideDevUtils::Errors::ControlPartsError, control
-          end
+          raise AbideDevUtils::Errors::ControlPartsError, control if group.xpath('Rule').length != 1
+
           rule_id = group.xpath('Rule/@id').first.value
           title = group.xpath('Rule/title').text
-          return [vuln_id, rule_id, title]
+          [vuln_id, rule_id, title]
         else
           raise AbideDevUtils::Errors::ControlPartsError, control
         end
@@ -263,7 +260,9 @@ module AbideDevUtils
       def map_indexed(indicies: [], index: 'title', framework: 'cis', key_prefix: '')
         c_map = profiles.each_with_object({}) do |profile, obj|
           obj[profile.level.downcase] = {} unless obj[profile.level.downcase].is_a?(Hash)
-          obj[profile.level.downcase][profile.title.downcase] = map_controls_hash(profile, indicies, index).sort_by { |k, _| k }.to_h
+          obj[profile.level.downcase][profile.title.downcase] = map_controls_hash(profile, indicies, index).sort_by do |k, _|
+            k
+          end.to_h
         end
 
         c_map['benchmark'] = { 'title' => title, 'version' => version }
@@ -423,7 +422,8 @@ module AbideDevUtils
         elsif title.include?(CIS_TITLE_MARKER)
           return :cis
         end
-        raise AbideDevUtils::Errors::UnsupportedXCCDFError, "XCCDF type is unsupported!"
+
+        raise AbideDevUtils::Errors::UnsupportedXCCDFError, 'XCCDF type is unsupported!'
       end
     end
 
