@@ -4,9 +4,9 @@ require 'date'
 require 'json'
 require 'pathname'
 require 'yaml'
-require 'abide_dev_utils/ppt'
-require 'abide_dev_utils/validate'
-require 'abide_dev_utils/sce/benchmark'
+require_relative '../../ppt'
+require_relative '../../validate'
+require_relative '../benchmark_loader'
 
 module AbideDevUtils
   module Sce
@@ -16,9 +16,9 @@ module AbideDevUtils
       module CoverageReport
         def self.generate(format_func: :to_h, opts: {})
           opts = ReportOptions.new(opts)
-          pupmod = AbideDevUtils::Ppt::PuppetModule.new
-          benchmarks = AbideDevUtils::Sce::Benchmark.benchmarks_from_puppet_module(pupmod,
-                                                                                   ignore_all_errors: opts.ignore_all_errors)
+          benchmarks = AbideDevUtils::Sce::BenchmarkLoader.benchmarks_from_puppet_module(
+            ignore_all_errors: opts.ignore_all_errors
+          )
           benchmarks.map do |b|
             BenchmarkReport.new(b, opts).run.send(format_func)
           end

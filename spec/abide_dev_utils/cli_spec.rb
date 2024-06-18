@@ -82,7 +82,7 @@ RSpec.describe Abide::CLI do
             select_profile: %w[profile1 profile2],
             select_level: %w[1 2]
           }
-        )
+        ).and_return([[], []])
       )
       capture_stdout_stderr do
         described_class.execute(

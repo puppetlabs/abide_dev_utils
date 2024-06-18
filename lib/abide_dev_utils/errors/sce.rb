@@ -28,5 +28,12 @@ module AbideDevUtils
     class ControlIdFrameworkMismatchError < GenericError
       @default = 'Control ID is invalid with the given framework:'
     end
+
+    # Raised when a benchmark fails to load for a non-specific reason
+    class BenchmarkLoadError < GenericError
+      attr_accessor :framework, :osname, :major_version, :module_name, :original_error
+
+      @default = 'Error loading benchmark:'
+    end
   end
 end

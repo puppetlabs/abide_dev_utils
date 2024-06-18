@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# This should be unused, keeping around incase shit breaks and it's needed
 require 'abide_dev_utils/dot_number_comparable'
 require 'abide_dev_utils/errors'
 require 'abide_dev_utils/sce/hiera_data/mapping_data'

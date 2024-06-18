@@ -30,9 +30,9 @@ module AbideDevUtils
       end
     end
 
-    def method_missing(name, *args, &block)
+    def method_missing(name, *args, **kwargs, &block)
       if name.to_s.start_with?('add_')
-        add(name.to_s.sub('add_', '').to_sym, *args, &block)
+        add(name.to_s.sub('add_', '').to_sym, *args, **kwargs, &block)
       else
         super
       end

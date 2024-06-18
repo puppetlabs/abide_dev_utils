@@ -6,10 +6,10 @@ require 'puppet-strings/yard'
 require 'shellwords'
 require 'timeout'
 require 'yaml'
-require 'abide_dev_utils/markdown'
-require 'abide_dev_utils/output'
-require 'abide_dev_utils/ppt'
-require 'abide_dev_utils/sce/benchmark'
+require_relative '../../markdown'
+require_relative '../../output'
+require_relative '../../ppt'
+require_relative '../benchmark_loader'
 
 module AbideDevUtils
   module Sce
@@ -19,9 +19,14 @@ module AbideDevUtils
         MAPPING_PATH_KEY = 'Mapping Data'
         RESOURCE_DATA_PATH_KEY = 'Resource Data'
 
+        # @return [Array<Array<StandardError>>] Returns a 2d array with two items. The first item
+        #   is an array containing StandardError-derived objects that are considered halting errors
+        #   in reference generation. The second item is an array of StandardError-derived objects
+        #   that are considered non-halting (warning) errors.
         def self.generate(data = {})
-          pupmod = AbideDevUtils::Ppt::PuppetModule.new
-          doc_title = case pupmod.name
+          pupmod_path = data[:module_dir] || Dir.pwd
+          bm_loader = BenchmarkLoader::PupMod.new(pupmod_path, ignore_framework_mismatch: true)
+          doc_title = case bm_loader.pupmod.name
                       when 'puppetlabs-sce_linux'
                         'SCE for Linux Reference'
                       when 'puppetlabs-sce_windows'
@@ -29,14 +34,15 @@ module AbideDevUtils
                       else
                         'Reference'
                       end
-          benchmarks = AbideDevUtils::Sce::Benchmark.benchmarks_from_puppet_module(pupmod)
+          benchmarks = bm_loader.load
           case data.fetch(:format, 'markdown')
           when 'markdown'
             file = data[:out_file] || 'REFERENCE.md'
-            MarkdownGenerator.new(benchmarks, pupmod.name, file: file, opts: data).generate(doc_title)
+            MarkdownGenerator.new(benchmarks, bm_loader.pupmod.name, file: file, opts: data).generate(doc_title)
           else
             raise "Format #{data[:format]} is unsupported! Only `markdown` format supported"
           end
+          [bm_loader.load_errors, bm_loader.load_warnings]
         end
 
         def self.generate_markdown
@@ -365,7 +371,7 @@ module AbideDevUtils
           def control_params_builder
             return unless control_has_valid_params?
 
-            @md.add_ul('Parameters:')
+            @md.add_h3('Parameters:')
             [@control.param_hashes, @control.resource.sce_options, @control.resource.sce_protected].each do |collection|
               collection.each do |hsh|
                 rparam = resource_param(hsh)
@@ -384,9 +390,9 @@ module AbideDevUtils
             # the generator a list of levels we want to use. If we didn't give it a list of levels, then we
             # want to use all of the levels that the control supports from @control.
             if @framework == 'stig'
-              @md.add_ul('Supported MAC Levels:')
+              @md.add_h3('Supported MAC Levels:')
             else
-              @md.add_ul('Supported Levels:')
+              @md.add_h3('Supported Levels:')
             end
 
             if @valid_level.empty?
@@ -407,9 +413,9 @@ module AbideDevUtils
             # the generator a list of profiles we want to use. If we didn't give it a list of profiles, then we
             # want to use all of the profiles that the control supports from @control.
             if @framework == 'stig'
-              @md.add_ul('Supported Confidentiality:')
+              @md.add_h3('Supported Confidentiality:')
             else
-              @md.add_ul('Supported Profiles:')
+              @md.add_h3('Supported Profiles:')
             end
 
             if @valid_profile.empty?
@@ -426,7 +432,7 @@ module AbideDevUtils
           def control_alternate_ids_builder
             # return if @framework == 'stig'
 
-            @md.add_ul('Alternate Config IDs:')
+            @md.add_h3('Alternate Config IDs:')
             @control.alternate_ids.each do |l|
               @md.add_ul(@md.code(l), indent: 1)
             end
@@ -448,9 +454,8 @@ module AbideDevUtils
             dep_ctrls = @control.resource.dependent_controls
             return if dep_ctrls.nil? || dep_ctrls.empty?
 
-            @md.add_ul('Dependent controls:')
+            @md.add_h3('Dependent controls:')
             dep_ctrls.each do |ctrl|
-              puts "DEPENDENT: #{ctrl.id}"
               @md.add_ul(@md.code(ctrl.display_title), indent: 1)
             end
           end
@@ -471,11 +476,9 @@ module AbideDevUtils
             @control.title.nil? ? out_str.unshift("    #{@control.id.dump}:") : out_str.unshift("    #{@control.title.dump}:")
             out_str.unshift('  control_configs:')
             out_str.unshift("#{@module_name.split('-').last}::config:")
-            @md.add_ul('Hiera Configuration Example:')
+            @md.add_h3('Hiera Configuration Example:')
             @md.add_code_block(out_str.join("\n"), language: 'yaml')
           rescue StandardError => e
-            require 'pry'
-            binding.pry
             err_msg = [
               "Failed to generate config example for control #{@control.id}",
               "Error: #{e.message}",
@@ -486,7 +489,8 @@ module AbideDevUtils
           end
 
           def resource_reference_builder
-            @md.add_ul("Resource: #{@md.code(@control.resource.to_reference)}")
+            @md.add_h3('Resource:')
+            @md.add_ul(@md.code(@control.resource.to_reference), indent: 1)
           end
         end
 
