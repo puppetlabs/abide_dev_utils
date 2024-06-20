@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    abide_dev_utils (0.18.0)
+    abide_dev_utils (0.18.1)
       cmdparse (~> 3.0)
       facterdb (>= 1.21)
       google-cloud-storage (~> 1.34)

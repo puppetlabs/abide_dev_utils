@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# This should be unused, keeping around incase shit breaks and it's needed
 require 'set'
 
 module AbideDevUtils

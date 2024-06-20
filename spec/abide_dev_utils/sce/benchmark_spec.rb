@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
-# require 'abide_dev_utils/ppt'
-# require 'abide_dev_utils/sce/benchmark'
 
 RSpec.describe('AbideDevUtils::Sce::Benchmark') do
   { sce_linux: sce_linux_fixture, sce_windows: sce_windows_fixture }.each do |mname, fix|
@@ -12,7 +10,9 @@ RSpec.describe('AbideDevUtils::Sce::Benchmark') do
       test_objs = []
       Dir.chdir(fix) do
         test_objs << AbideDevUtils::Ppt::PuppetModule.new
-        test_objs << AbideDevUtils::Sce::Benchmark.benchmarks_from_puppet_module(test_objs.first)
+        test_objs << AbideDevUtils::Sce::BenchmarkLoader.benchmarks_from_puppet_module(
+          ignore_framework_mismatch: true
+        )
       end
 
       context 'when supplied a PuppetModule' do

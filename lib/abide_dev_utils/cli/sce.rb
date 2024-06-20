@@ -126,7 +126,35 @@ module Abide
 
       def execute
         AbideDevUtils::Validate.puppet_module_directory
-        AbideDevUtils::Sce::Generate::Reference.generate(@data)
+        errors, warnings = AbideDevUtils::Sce::Generate::Reference.generate(@data)
+
+        errors.each do |err|
+          output = ["[error]: #{err.message}"]
+          # Errors should all be instances of AbideDevUtils::Errors::BenchmarkLoadError
+          # We check that the extra methods on this error are valid before calling them, though, because
+          # other errors might be returned somehow.
+          if err.respond_to?(:osname) && err.respond_to?(:major_version)
+            output << "Operating System: #{err.osname} #{err.major_version}"
+          end
+          output << "Framework: #{err.framework}" if err.respond_to?(:framework)
+          output << "Puppet Module: #{err.module_name}" if err.respond_to?(:module_name)
+          output << "Original Error Type: #{err.original_error.class}" if err.respond_to?(:original_error)
+          output << "Backtrace:\n\t\t#{err.backtrace.join("\n\t\t")}\n"
+          AbideDevUtils::Output.simple(output.join("\n\t"), stream: $stderr)
+        end
+        warnings.each do |err|
+          output = ["[warn]: #{err.message}"]
+          # Errors should all be instances of AbideDevUtils::Errors::BenchmarkLoadError
+          # We check that the extra methods on this error are valid before calling them, though, because
+          # other errors might be returned somehow.
+          if err.respond_to?(:osname) && err.respond_to?(:major_version)
+            output << "Operating System: #{err.osname} #{err.major_version}"
+          end
+          output << "Framework: #{err.framework}" if err.respond_to?(:framework)
+          output << "Puppet Module: #{err.module_name}" if err.respond_to?(:module_name)
+          AbideDevUtils::Output.simple(output.join("\n\t"), stream: $stderr)
+        end
+        exit 1 unless errors.empty?
       end
     end
 

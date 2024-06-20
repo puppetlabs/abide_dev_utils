@@ -337,51 +337,6 @@ module AbideDevUtils
         @controls = resources.map(&:controls).flatten.sort
       end
 
-      # Creates Benchmark objects from a Puppet module
-      # @param pupmod [AbideDevUtils::Ppt::PuppetModule] A PuppetModule instance
-      # @param skip_errors [Boolean] True skips errors and loads non-erroring benchmarks, false raises the error.
-      # @return [Array<AbideDevUtils::Sce::Benchmark>] Array of Benchmark instances
-      def self.benchmarks_from_puppet_module(pupmod, ignore_all_errors: false, ignore_framework_mismatch: true)
-        frameworks = pupmod.hiera_conf.local_hiera_files(hierarchy_name: 'Mapping Data').each_with_object([]) do |hf, ary|
-          parts = hf.path.split(pupmod.hiera_conf.default_datadir)[-1].split('/')
-          ary << parts[2] unless ary.include?(parts[2])
-        end
-        pupmod.supported_os.each_with_object([]) do |supp_os, ary|
-          osname, majver = supp_os.split('::')
-          if majver.is_a?(Array)
-            majver.sort.each do |v|
-              frameworks.each do |fw|
-                benchmark = Benchmark.new(osname,
-                                          v,
-                                          pupmod.hiera_conf,
-                                          pupmod.name(strip_namespace: true),
-                                          framework: fw)
-                benchmark.controls
-                ary << benchmark
-              rescue AbideDevUtils::Errors::MappingDataFrameworkMismatchError => e
-                raise e unless ignore_all_errors || ignore_framework_mismatch
-              rescue StandardError => e
-                raise e unless ignore_all_errors
-              end
-            end
-          else
-            frameworks.each do |fw|
-              benchmark = Benchmark.new(osname,
-                                        majver,
-                                        pupmod.hiera_conf,
-                                        pupmod.name(strip_namespace: true),
-                                        framework: fw)
-              benchmark.controls
-              ary << benchmark
-            rescue AbideDevUtils::Errors::MappingDataFrameworkMismatchError => e
-              raise e unless ignore_all_errors || ignore_framework_mismatch
-            rescue StandardError => e
-              raise e unless ignore_all_errors
-            end
-          end
-        end
-      end
-
       def map_data
         mapper.map_data
       end

@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-require 'abide_dev_utils/errors'
-require 'abide_dev_utils/ppt/facter_utils'
-require 'abide_dev_utils/sce/hiera_data/resource_data/control'
-require 'abide_dev_utils/sce/hiera_data/resource_data/resource'
+# This should be unused, keeping around incase shit breaks and it's needed
+require_relative '../../../errors'
+require_relative '../../../ppt/facter_utils'
+require_relative '../benchmark_loader'
 
 module AbideDevUtils
   module Sce
