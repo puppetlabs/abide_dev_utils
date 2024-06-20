@@ -128,10 +128,10 @@ module AbideDevUtils
           attr_reader :search_patterns
 
           def initialize(search_patterns: nil, opts: {})
-            @search_patterns = search_patterns || PuppetStrings::DEFAULT_SEARCH_PATTERNS
+            @search_patterns = search_patterns || ::PuppetStrings::DEFAULT_SEARCH_PATTERNS
             @debug = opts[:debug]
             @quiet = opts[:quiet]
-            PuppetStrings::Yard.setup!
+            ::PuppetStrings::Yard.setup!
             YARD::CLI::Yardoc.run(*yard_args(@search_patterns, debug: @debug, quiet: @quiet))
           end
 
@@ -225,25 +225,6 @@ module AbideDevUtils
           end
         end
 
-        # Generates markdown for Puppet classes based on Puppet Strings JSON
-        # class PuppetClassMarkdown
-        #   def initialize(puppet_classes, md, opts: {})
-        #     @puppet_classes = puppet_classes
-        #     @md = md
-        #     @opts = opts
-        #   end
-
-        #   def generate!
-        #     @puppet_classes.each do |puppet_class|
-        #       @md.add_h2(puppet_class['name'])
-        #       @md.add_paragraph("File(Line): `#{puppet_class['file']}(#{puppet_class['line']})`")
-
-        #   private
-
-        #   def doc_string_builder(puppet_class)
-        #     return if puppet_class['docstring'].nil? || puppet_class['docstring'].empty?
-        # end
-
         # Generates markdown for a control
         class ControlMarkdown
           def initialize(control, md, strings, module_name, framework, formatter: nil, opts: {})
@@ -262,49 +243,23 @@ module AbideDevUtils
           def generate!
             heading_builder
             control_params_builder
-            control_levels_builder
-            control_profiles_builder
+            control_profiles_levels_builder
             config_example_builder
             control_alternate_ids_builder
             dependent_controls_builder
             resource_reference_builder
           end
 
-          # This function act as a filter for controls based on the profile and level selections.
-          # There are few scanarios that can happen:
-          # 1. If no selections are made for profile or level, then all profiles and levels of control will be selected.
-          # 2. If selections are made for profile, then only the selected profile and all levels of control will be selected.
-          # 3. If selections are made for level, then only the selected level and all profiles of control will be selected.
-          # This function adds in some runtime overhead because we're checking each control's level and profile which is
-          # what we're going to be doing later when building the level and profile markdown, but this is
-          # necessary to ensure that the reference.md is generated the way we want it to be.
+          # This function gets the array of string representations of profiles and levels
+          # from the control based on selection filters in opts, if any.
+          # @return [Boolean] if valid profiles and levels were extracted from the control.
           def verify_profile_and_level_selections
-            return true if @opts[:select_profile].nil? && @opts[:select_level].nil?
-
-            if @opts[:select_profile].nil? && !@opts[:select_level].nil?
-              @control.levels.each do |level|
-                @valid_level << level if select_control_level(level)
-              end
-
-              return true unless @valid_level.empty?
-            elsif !@opts[:select_profile].nil? && @opts[:select_level].nil?
-              @control.profiles.each do |profile|
-                @valid_profile << profile if select_control_profile(profile)
-              end
-
-              return true unless @valid_profile.empty?
-            elsif !@opts[:select_profile].nil? && !@opts[:select_level].nil?
-              @control.levels.each do |level|
-                @valid_level << level if select_control_level(level)
-              end
-
-              @control.profiles.each do |profile|
-                @valid_profile << profile if select_control_profile(profile)
-              end
-
-              # As long as there are valid profiles and levels for the control at this stage, all is good
-              !@valid_level.empty? && !@valid_profile.empty?
-            end
+            @valid_profs_lvls = @control.filtered_profiles_levels(
+              prof: @opts[:select_profile],
+              lvl: @opts[:select_level]
+            )
+            @valid_profs_lvls.uniq!
+            !@valid_profs_lvls.empty?
           end
 
           private
@@ -383,49 +338,18 @@ module AbideDevUtils
             end
           end
 
-          def control_levels_builder
-            return unless @control.levels
-
-            # @valid_level is populated in verify_profile_and_level_selections from the fact that we've given
-            # the generator a list of levels we want to use. If we didn't give it a list of levels, then we
-            # want to use all of the levels that the control supports from @control.
-            if @framework == 'stig'
-              @md.add_h3('Supported MAC Levels:')
-            else
-              @md.add_h3('Supported Levels:')
-            end
-
-            if @valid_level.empty?
-              @control.levels.each do |l|
-                @md.add_ul(@md.code(l), indent: 1)
-              end
-            else
-              @valid_level.each do |l|
-                @md.add_ul(@md.code(l), indent: 1)
-              end
-            end
-          end
-
-          def control_profiles_builder
+          def control_profiles_levels_builder
             return unless @control.profiles
 
-            # @valid_profile is populated in verify_profile_and_level_selections from the fact that we've given
-            # the generator a list of profiles we want to use. If we didn't give it a list of profiles, then we
-            # want to use all of the profiles that the control supports from @control.
             if @framework == 'stig'
-              @md.add_h3('Supported Confidentiality:')
+              @md.add_h3('Supported Confidentiality & MAC Levels:')
             else
-              @md.add_h3('Supported Profiles:')
+              @md.add_h3('Supported Profiles & Levels:')
             end
 
-            if @valid_profile.empty?
-              @control.profiles.each do |l|
-                @md.add_ul(@md.code(l), indent: 1)
-              end
-            else
-              @valid_profile.each do |l|
-                @md.add_ul(@md.code(l), indent: 1)
-              end
+            @valid_profs_lvls.each do |plstr|
+              p, l = plstr.split(';;;', 2)
+              @md.add_ul(@md.code("#{p}, #{l}"), indent: 1)
             end
           end
 

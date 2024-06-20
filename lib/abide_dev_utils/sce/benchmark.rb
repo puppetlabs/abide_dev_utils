@@ -148,7 +148,7 @@ module AbideDevUtils
     # Represents a singular rule in a benchmark
     class Control
       include AbideDevUtils::DotNumberComparable
-      attr_reader :id, :params, :resource, :framework, :dependent
+      attr_reader :id, :params, :resource, :framework, :dependent, :profiles_levels
 
       def initialize(id, params, resource, framework, mapper)
         validate_id_with_framework(id, framework, mapper)
@@ -157,6 +157,7 @@ module AbideDevUtils
         @resource = resource
         @framework = framework
         @mapper = mapper
+        @profiles_levels = find_levels_and_profiles
         raise AbideDevUtils::Errors::NoMappingDataForControlError, @id unless @mapper.get(id)
       end
 
@@ -202,12 +203,38 @@ module AbideDevUtils
         send(display_title_type) unless display_title_type.nil?
       end
 
+      def profiles_levels_by_level(lvl)
+        pls = profiles_levels.map do |plstr|
+          _, l = plstr.split(';;;', 2)
+          plstr if l == lvl || (lvl.is_a?(Array) && lvl.include?(l))
+        end
+        pls.compact.uniq
+      end
+
+      def profiles_levels_by_profile(prof)
+        pls = profiles_levels.map do |plstr|
+          p, = plstr.split(';;;', 2)
+          plstr if p == prof || (prof.is_a?(Array) && prof.include?(p))
+        end
+        pls.compact.uniq
+      end
+
+      def filtered_profiles_levels(prof: nil, lvl: nil)
+        return profiles_levels if (prof.nil? || prof.empty?) && (lvl.nil? || lvl.empty?)
+        if prof && lvl && !prof.empty? && !lvl.empty?
+          return profiles_levels_by_profile(prof).concat(profiles_levels_by_level(lvl))
+        end
+        return profiles_levels_by_profile(prof) unless prof&.empty?
+
+        profiles_levels_by_level(lvl)
+      end
+
       def levels
-        levels_and_profiles[0]
+        profiles_levels.map { |plstr| plstr.split(';;;', 2).last }
       end
 
       def profiles
-        levels_and_profiles[1]
+        profiles_levels.map { |plstr| plstr.split(';;;', 2).first }
       end
 
       def valid_maps?
@@ -269,22 +296,16 @@ module AbideDevUtils
         @map ||= @mapper.get(id)
       end
 
-      def levels_and_profiles
-        @levels_and_profiles ||= find_levels_and_profiles
-      end
-
       def find_levels_and_profiles
-        lvls = []
-        profs = []
+        profs_lvls = []
         @mapper.levels.each do |lvl|
           @mapper.profiles.each do |prof|
-            unless @mapper.get(id, level: lvl, profile: prof).nil?
-              lvls << lvl
-              profs << prof
-            end
+            next unless @mapper.get(id, level: lvl, profile: prof)
+
+            profs_lvls << "#{prof};;;#{lvl}"
           end
         end
-        [lvls.flatten.compact.uniq, profs.flatten.compact.uniq]
+        profs_lvls.uniq.sort
       end
 
       def ruby_class_to_puppet_type(class_name)
