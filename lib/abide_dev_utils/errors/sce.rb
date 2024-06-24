@@ -34,6 +34,16 @@ module AbideDevUtils
       attr_accessor :framework, :osname, :major_version, :module_name, :original_error
 
       @default = 'Error loading benchmark:'
+
+      def message
+        [
+          "#{super} (#{original_error.class})",
+          "Framework: #{framework}",
+          "OS Name: #{osname}",
+          "OS Version: #{major_version}",
+          "Module Name: #{module_name}"
+        ].join(', ')
+      end
     end
   end
 end
