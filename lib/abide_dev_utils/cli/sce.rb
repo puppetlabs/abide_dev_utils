@@ -57,10 +57,6 @@ module Abide
         options.on('-I', '--no-ignore-benchmark-errors', 'Does not ignore errors while generating benchmark reports') do
           @data[:ignore_benchmark_errors] = false
         end
-        options.on('-X [XCCDF_DIR]', '--xccdf-dir [XCCDF_DIR]',
-                   'If specified, the coverage report will be correlated with info from the benchmark XCCDF files') do |d|
-          @data[:xccdf_dir] = d
-        end
         options.on('-v', '--verbose', 'Will output the report to the console') { @data[:verbose] = true }
         options.on('-q', '--quiet', 'Will not output anything to the console') { @data[:quiet] = true }
       end
@@ -75,8 +71,7 @@ module Abide
           benchmark: @data[:benchmark],
           profile: @data[:profile],
           level: @data[:level],
-          ignore_benchmark_errors: ignore,
-          xccdf_dir: @data[:xccdf_dir]
+          ignore_benchmark_errors: ignore
         }
         AbideDevUtils::Output.simple('Generating coverage report...') unless quiet
         coverage = AbideDevUtils::Sce::Generate::CoverageReport.generate(format_func: :to_h, opts: generate_opts)

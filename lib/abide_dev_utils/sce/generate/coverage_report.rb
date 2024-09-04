@@ -22,7 +22,6 @@ module AbideDevUtils
         # @option opts [String] :level the level to generate the report for
         # @option opts [Symbol] :format_func the format function to use
         # @option opts [Boolean] :ignore_benchmark_errors ignore all errors when loading benchmarks
-        # @option opts [String] :xccdf_dir the directory containing the XCCDF files
         def self.generate(format_func: :to_h, opts: {})
           opts = ReportOptions.new(opts)
           benchmarks = AbideDevUtils::Sce::BenchmarkLoader.benchmarks_from_puppet_module(
@@ -44,8 +43,7 @@ module AbideDevUtils
             profile: nil,
             level: nil,
             format_func: :to_h,
-            ignore_benchmark_errors: false,
-            xccdf_dir: nil
+            ignore_benchmark_errors: false
           }.freeze
 
           attr_reader(*DEFAULTS.keys)
@@ -58,7 +56,7 @@ module AbideDevUtils
           end
 
           def report_type
-            @report_type ||= (xccdf_dir.nil? ? :basic_coverage : :correlated_coverage)
+            :basic_coverage
           end
         end
 
@@ -302,34 +300,6 @@ module AbideDevUtils
                 end
               end
             end
-          end
-
-          def find_controls_in_mapping_data
-            controls = @benchmark.map_data[0].each_with_object([]) do |(_, mapping), arr|
-              mapping.each do |level, profs|
-                next if level == 'benchmark'
-
-                case @benchmark.framework
-                when 'cis'
-                  profs.each do |_, ctrls|
-                    arr << ctrls.keys
-                    arr << ctrls.values
-                  end
-                when 'stig'
-                  require 'pry'
-                  binding.pry
-                else
-                  raise "Cannot find controls for framework #{@benchmark.framework}"
-                end
-              end
-            end
-            controls.flatten.uniq
-          end
-        end
-
-        class ReportOutputCorrelation
-          def initialize(cov_rep)
-            @cov_rep = cov_rep
           end
         end
       end
