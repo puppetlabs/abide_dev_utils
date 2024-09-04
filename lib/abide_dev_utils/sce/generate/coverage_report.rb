@@ -14,23 +14,37 @@ module AbideDevUtils
       # Methods and objects used to construct a report of what SCE enforces versus what
       # the various compliance frameworks expect to be enforced.
       module CoverageReport
+        # Generate a coverage report for a Puppet module
+        # @param format_func [Symbol] the format function to use
+        # @param opts [Hash] options for generating the report
+        # @option opts [String] :benchmark the benchmark to generate the report for
+        # @option opts [String] :profile the profile to generate the report for
+        # @option opts [String] :level the level to generate the report for
+        # @option opts [Symbol] :format_func the format function to use
+        # @option opts [Boolean] :ignore_benchmark_errors ignore all errors when loading benchmarks
+        # @option opts [String] :xccdf_dir the directory containing the XCCDF files
         def self.generate(format_func: :to_h, opts: {})
           opts = ReportOptions.new(opts)
           benchmarks = AbideDevUtils::Sce::BenchmarkLoader.benchmarks_from_puppet_module(
-            ignore_all_errors: opts.ignore_all_errors
+            ignore_all_errors: opts.ignore_benchmark_errors
           )
-          benchmarks.map do |b|
+          benchmarks.filter_map do |b|
+            next if opts.benchmark && !Regexp.new(Regexp.escape(opts.benchmark)).match?(b.title_key)
+            next if opts.profile && b.mapper.profiles.none?(opts.profile)
+            next if opts.level && b.mapper.levels.none?(opts.level)
+
             BenchmarkReport.new(b, opts).run.send(format_func)
           end
         end
 
+        # Holds options for generating a report
         class ReportOptions
           DEFAULTS = {
             benchmark: nil,
             profile: nil,
             level: nil,
             format_func: :to_h,
-            ignore_all_errors: false,
+            ignore_benchmark_errors: false,
             xccdf_dir: nil
           }.freeze
 
@@ -150,94 +164,17 @@ module AbideDevUtils
           end
         end
 
-        class OldReport
-          def initialize(benchmarks)
-            @benchmarks = benchmarks
-          end
-
-          def self.generate
-            coverage = {}
-            coverage['classes'] = {}
-            all_cap = ClassUtils.find_all_classes_and_paths(puppet_class_dir)
-            invalid_classes = find_invalid_classes(all_cap)
-            valid_classes = find_valid_classes(all_cap, invalid_classes)
-            coverage['classes']['invalid'] = invalid_classes
-            coverage['classes']['valid'] = valid_classes
-            hiera = YAML.safe_load(File.open(hiera_path))
-            profile&.gsub!(/^profile_/, '') unless profile.nil?
-
-            matcher = profile.nil? ? /^profile_/ : /^profile_#{profile}/
-            hiera.each do |k, v|
-              key_base = k.split('::')[-1]
-              coverage['benchmark'] = v if key_base == 'title'
-              next unless key_base.match?(matcher)
-
-              coverage[key_base] = generate_uncovered_data(v, valid_classes)
-            end
-            coverage
-          end
-
-          def self.generate_uncovered_data(ctrl_list, valid_classes)
-            out_hash = {}
-            out_hash[:num_total] = ctrl_list.length
-            out_hash[:uncovered] = []
-            out_hash[:covered] = []
-            ctrl_list.each do |c|
-              if valid_classes.include?(c)
-                out_hash[:covered] << c
-              else
-                out_hash[:uncovered] << c
-              end
-            end
-            out_hash[:num_covered] = out_hash[:covered].length
-            out_hash[:num_uncovered] = out_hash[:uncovered].length
-            out_hash[:coverage] = Float(
-              (Float(out_hash[:num_covered]) / Float(out_hash[:num_total])) * 100.0
-            ).floor(3)
-            out_hash
-          end
-
-          def self.find_valid_classes(all_cap, invalid_classes)
-            all_classes = all_cap.dup.transpose[0]
-            return [] if all_classes.nil?
-
-            return all_classes - invalid_classes unless invalid_classes.nil?
-
-            all_classes
-          end
-
-          def self.find_invalid_classes(all_cap)
-            invalid_classes = []
-            all_cap.each do |cap|
-              invalid_classes << cap[0] unless class_valid?(cap[1])
-            end
-            invalid_classes
-          end
-
-          def self.class_valid?(manifest_path)
-            compiler = Puppet::Pal::Compiler.new(nil)
-            ast = compiler.parse_file(manifest_path)
-            ast.body.body.statements.each do |s|
-              next unless s.respond_to?(:arguments)
-              next unless s.arguments.respond_to?(:each)
-
-              s.arguments.each do |i|
-                return false if i.value == 'Not implemented'
-              end
-            end
-            true
-          end
-        end
-
         # Class manages organizing report data into various output formats
         class ReportOutput
           attr_reader :controls_in_resource_data, :rules_in_map, :timestamp,
                       :title
 
-          def initialize(benchmark, controls_in_resource_data, rules_in_map)
+          def initialize(benchmark, controls_in_resource_data, rules_in_map, profile: nil, level: nil)
             @benchmark = benchmark
             @controls_in_resource_data = controls_in_resource_data
             @rules_in_map = rules_in_map
+            @profile = profile
+            @level = level
             @timestamp = DateTime.now.iso8601
             @title = "Coverage Report for #{@benchmark.title_key}"
           end
@@ -287,7 +224,9 @@ module AbideDevUtils
             {
               title: @benchmark.title,
               version: @benchmark.version,
-              framework: @benchmark.framework
+              framework: @benchmark.framework,
+              profile: @profile || 'all',
+              level: @level || 'all'
             }
           end
 
@@ -310,6 +249,8 @@ module AbideDevUtils
           def initialize(benchmark, opts = ReportOptions.new)
             @benchmark = benchmark
             @opts = opts
+            @special_control_names = %w[sce_options sce_protected]
+            @stig_map_types = %w[vulnid ruleid]
           end
 
           def run
@@ -327,7 +268,7 @@ module AbideDevUtils
           def basic_coverage(level: @opts.level, profile: @opts.profile)
             map_type = @benchmark.map_type(controls_in_resource_data[0])
             rules_in_map = @benchmark.rules_in_map(map_type, level: level, profile: profile)
-            ReportOutput.new(@benchmark, controls_in_resource_data, rules_in_map)
+            ReportOutput.new(@benchmark, controls_in_resource_data, rules_in_map, profile: profile, level: level)
           end
 
           # def correlated_coverage(level: @opts.level, profile: @opts.profile)
@@ -348,13 +289,17 @@ module AbideDevUtils
                      end
             end
             controls.flatten.uniq.select do |c|
-              case @benchmark.framework
-              when 'cis'
-                @benchmark.map_type(c) != 'vulnid'
-              when 'stig'
-                @benchmark.map_type(c) == 'vulnid'
+              if @special_control_names.include? c
+                false
               else
-                raise "Cannot find controls for framework #{@benchmark.framework}"
+                case @benchmark.framework
+                when 'cis'
+                  @stig_map_types.none? @benchmark.map_type(c)
+                when 'stig'
+                  @stig_map_types.include? @benchmark.map_type(c)
+                else
+                  raise "Cannot find controls for framework #{@benchmark.framework}"
+                end
               end
             end
           end
@@ -364,9 +309,17 @@ module AbideDevUtils
               mapping.each do |level, profs|
                 next if level == 'benchmark'
 
-                profs.each do |_, ctrls|
-                  arr << ctrls.keys
-                  arr << ctrls.values
+                case @benchmark.framework
+                when 'cis'
+                  profs.each do |_, ctrls|
+                    arr << ctrls.keys
+                    arr << ctrls.values
+                  end
+                when 'stig'
+                  require 'pry'
+                  binding.pry
+                else
+                  raise "Cannot find controls for framework #{@benchmark.framework}"
                 end
               end
             end

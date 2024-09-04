@@ -54,8 +54,8 @@ module Abide
         options.on('-L [LEVEL]', '--level [LEVEL]', 'Specify the level to show coverage for') do |l|
           @data[:level] = l
         end
-        options.on('-I', '--ignore-benchmark-errors', 'Ignores errors while generating benchmark reports') do
-          @data[:ignore_all] = true
+        options.on('-I', '--no-ignore-benchmark-errors', 'Does not ignore errors while generating benchmark reports') do
+          @data[:ignore_benchmark_errors] = false
         end
         options.on('-X [XCCDF_DIR]', '--xccdf-dir [XCCDF_DIR]',
                    'If specified, the coverage report will be correlated with info from the benchmark XCCDF files') do |d|
@@ -70,15 +70,18 @@ module Abide
         out_format = @data.fetch(:format, 'yaml')
         quiet = @data.fetch(:quiet, false)
         console = @data.fetch(:verbose, false) && !quiet
+        ignore = @data.fetch(:ignore_benchmark_errors, true)
         generate_opts = {
           benchmark: @data[:benchmark],
           profile: @data[:profile],
           level: @data[:level],
-          ignore_benchmark_errors: @data.fetch(:ignore_all, false),
+          ignore_benchmark_errors: ignore,
           xccdf_dir: @data[:xccdf_dir]
         }
         AbideDevUtils::Output.simple('Generating coverage report...') unless quiet
         coverage = AbideDevUtils::Sce::Generate::CoverageReport.generate(format_func: :to_h, opts: generate_opts)
+        raise 'No coverage data found' if coverage.empty?
+
         AbideDevUtils::Output.simple("Saving coverage report to #{file_name}...")
         case out_format
         when /yaml/i
