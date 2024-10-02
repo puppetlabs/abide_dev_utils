@@ -97,6 +97,23 @@ module AbideDevUtils
                 raise "Failed to generate markdown for control #{control.id}. Original message: #{e.message}"
               end
             end
+
+            if @module_name.split('-').last == 'sce_linux'
+              md.add_h1('List of known CIS control sections that use plans and tasks:')
+              md.add_ul('Red Hat Enterprise Linux 7: Section 6.2', indent: 1)
+              md.add_ul('Red Hat Enterprise Linux 8: Section 6.2', indent: 1)
+              md.add_ul('Red Hat Enterprise Linux 9: Section 7.2', indent: 1)
+              md.add_ul('Oracle Linux 7: Section 6.2', indent: 1)
+              md.add_ul('Oracle Linux 8: Section 6.2', indent: 1)
+              md.add_ul('Oracle Linux 9: Section 7.2', indent: 1)
+              md.add_ul('Rocky Linux 8: Section 6.2', indent: 1)
+              md.add_ul('Rocky Linux 9: Section 7.2', indent: 1)
+              md.add_ul('AlmaLinux 8: Section 6.2', indent: 1)
+              md.add_ul('AlmaLinux 9: Section 7.2', indent: 1)
+              md.add_ul('Ubuntu 20.04: Section 6.2', indent: 1)
+              md.add_ul('Ubuntu 22.04: Section 7.2', indent: 1)
+            end
+
             AbideDevUtils::Output.simple("Saving markdown to #{@file}") unless @opts[:quiet]
             md.to_file
           end
