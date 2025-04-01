@@ -13,6 +13,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+# Set a global environment variable for the PUPPET_AUTH_TOKEN for all jobs as well as the BUNDLE_RUBYGEMS___PUPPETCORE__PUPPET__COM
+env:
+  PUPPET_AUTH_TOKEN: ${{ secrets.PUPPET_AUTH_TOKEN }}
+  BUNDLE_RUBYGEMS___PUPPETCORE__PUPPET__COM: "forge-key:${{ secrets.PUPPET_AUTH_TOKEN }}"
+
 jobs:
   rspec:
     runs-on: ubuntu-latest

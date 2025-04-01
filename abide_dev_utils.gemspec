@@ -35,7 +35,6 @@ Gem::Specification.new do |spec|
   # Prod dependencies
   spec.add_dependency 'nokogiri', '~> 1.13'
   spec.add_dependency 'cmdparse', '~> 3.0'
-  spec.add_dependency 'puppet', '>= 7.0.0'
   spec.add_dependency 'puppet-strings', '>= 2.7'
   spec.add_dependency 'jira-ruby', '~> 2.2'
   spec.add_dependency 'ruby-progressbar', '~> 1.11'
