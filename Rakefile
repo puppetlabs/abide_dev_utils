@@ -5,7 +5,8 @@ require "bundler/gem_tasks"
 require "rspec/core/rake_task"
 
 spec_task = RSpec::Core::RakeTask.new(:spec)
-spec_task.pattern = 'spec/abide_dev_utils_spec.rb,spec/abide_dev_utils/**/*_spec.rb'
+spec_task.pattern = ['spec/abide_dev_utils_spec.rb',
+                     'spec/abide_dev_utils/**/*_spec.rb']
 
 require "rubocop/rake_task"
 
@@ -13,7 +14,7 @@ RuboCop::RakeTask.new
 
 task default: %i[spec rubocop]
 
-MODULES = %w[puppetlabs-cem_linux puppetlabs-sce_linux puppetlabs-cem_windows puppetlabs-sce_windows].freeze
+MODULES = %w[puppetlabs-sce_linux puppetlabs-sce_windows].freeze
 
 def modules_with_repos
   @modules_with_repos ||= MODULES.select do |mod|

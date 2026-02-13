@@ -341,10 +341,7 @@ module AbideDevUtils
       def initialize(osname, major_version, hiera_conf, module_name, framework: 'cis')
         @osname = osname
         @major_version = major_version
-        @os_facts = AbideDevUtils::Ppt::FacterUtils::FactSets.new.find_by_fact_value_tuples(['os.name', @osname],
-                                                                                            ['os.release.major',
-                                                                                             @major_version])
-        @osfamily = @os_facts['os']['family']
+        @osfamily = os_family_for(@osname, @major_version)
         @hiera_conf = hiera_conf
         @module_name = module_name
         @framework = framework
@@ -416,6 +413,35 @@ module AbideDevUtils
 
       private
 
+      OS_FAMILY_MAP = {
+        'redhat' => 'RedHat',
+        'oraclelinux' => 'RedHat',
+        'almalinux' => 'RedHat',
+        'rocky' => 'RedHat',
+        'ubuntu' => 'Debian',
+        'windows' => 'Windows',
+      }.freeze
+
+      SUPPORT_OS_MAJ_VER_MAP = {
+        "redhat" => ['7', '8', '9'],
+        "oraclelinux" => ['7', '8', '9'],
+        "almalinux" => ['8', '9'],
+        "rocky" => ['8', '9'],
+        "ubuntu" => ['20.04', '22.04', '24.04'],
+        "windows" => ['2016', '10', '2019', '2022', '2025']
+      }
+
+      def os_family_for(osname, os_maj_version)
+        key = osname.to_s.downcase
+        family = OS_FAMILY_MAP[key]
+        supported_maj_vers = SUPPORT_OS_MAJ_VER_MAP[key] 
+        if family && supported_maj_vers.include?(os_maj_version)
+          return family
+        end
+
+        raise "Unsupported OS name '#{osname}' or version '#{os_maj_version}' for SCE benchmark"
+      end
+
       def load_mapping_data
         files = case module_name
                 when /_windows$/
@@ -433,6 +459,17 @@ module AbideDevUtils
       def sce_linux_mapping_files
         facts = [['os.name', osname], ['os.release.major', major_version]]
         mapping_files = hiera_conf.local_hiera_files_with_facts(*facts, hierarchy_name: 'Mapping Data')
+        # If we can't find the mapping files through using facts, then manually check for files in the Mapping Data directory that match the os name and major version.
+        if (mapping_files.nil? || mapping_files.empty?)
+          dir_exist = File.directory?(hiera_conf.default_datadir + "/mapping/cis/#{osname}/#{major_version}")
+          # If the directory for the os name and major version exists, we know there are mapping files. Mock EntryPathLocalFile objects for each of the files in that directory and use those as the mapping files.
+          if dir_exist 
+            mapping_files = Dir.glob(File.join(hiera_conf.default_datadir, "mapping/cis/#{osname}/#{major_version}/*.yaml")).map do |f|
+              trimmed_path = f.split(hiera_conf.default_datadir).last
+              AbideDevUtils::Ppt::Hiera::EntryPathLocalFile.new(trimmed_path, ['os.name', 'os.release.major'], [osname, major_version])
+            end
+          end
+        end
         raise AbideDevUtils::Errors::MappingFilesNotFoundError, facts if mapping_files.nil? || mapping_files.empty?
 
         mapping_files
@@ -441,6 +478,21 @@ module AbideDevUtils
       def sce_windows_mapping_files
         facts = ['os.release.major', major_version]
         mapping_files = hiera_conf.local_hiera_files_with_fact(facts[0], facts[1], hierarchy_name: 'Mapping Data')
+        # If we can't find the mapping files through using facts, then manually check for files in the Mapping Data directory that match the major version. 
+        # This is necessary because Facterdb may not have facter data for os.release.major, but sce_windows may still have mapping data files that can be used to load benchmarks.
+        if (mapping_files.nil? || mapping_files.empty?)
+          # Take a look at all the files in the Mapping Data directory and see if any of them match the major version. If they do, use those as the mapping files.
+          dir_exist = File.directory?(hiera_conf.default_datadir + "/mapping/cis/#{major_version}")
+          # Create EntryPathLocalFile objects for each of the files in that directory and use those as the mapping files.
+          if dir_exist 
+            mapping_files = Dir.glob(File.join(hiera_conf.default_datadir, "mapping/cis/#{major_version}/*.yaml")).map do |f|
+              # A bit of a hack fix but, we only need the part 'mapping/cis/major_version/filename.yaml' of the path for the EntryPathLocalFile object to work correctly.
+              # Trim the path down to just the part we need by splitting on the default datadir and taking the last part, then creating the EntryPathLocalFile object with that trimmed path.
+              trimmed_path = f.split(hiera_conf.default_datadir).last
+              AbideDevUtils::Ppt::Hiera::EntryPathLocalFile.new(trimmed_path, ['os.release.major'], [major_version])
+            end
+          end
+        end
         raise AbideDevUtils::Errors::MappingFilesNotFoundError, facts if mapping_files.nil? || mapping_files.empty?
 
         mapping_files
@@ -458,6 +510,28 @@ module AbideDevUtils
       def load_resource_data
         facts = [['os.family', osfamily], ['os.name', osname], ['os.release.major', major_version]]
         rdata_files = hiera_conf.local_hiera_files_with_facts(*facts, hierarchy_name: 'Resource Data')
+        # Same as getting mapping files, if we can't find the resource data files through using facts, then manually check for files in the Resource Data directory that match the os family, name, and major version.
+        # This is necessary because Facterdb may not have facter data for os.family, os.name, or os.release.major, but there may still be resource data files that can be used to load benchmarks.
+        if (rdata_files.nil? || rdata_files.empty?)
+          # Filter the name since on the Windows side, everything is lowered case.
+          if osfamily == 'Windows' 
+            osfamily_filtered = osfamily.downcase
+            osname_filtered = osname.downcase
+          else
+            osfamily_filtered = osfamily
+            osname_filtered = osname
+          end
+
+          dir_exist = File.directory?(hiera_conf.default_datadir + "/#{osfamily_filtered}/#{osname_filtered}")
+          if dir_exist 
+            rdata_files = Dir.glob(File.join(hiera_conf.default_datadir, "/#{osfamily_filtered}/#{osname_filtered}/#{major_version}.yaml")).map do |f|
+              trimmed_path = f.split(hiera_conf.default_datadir).last
+              AbideDevUtils::Ppt::Hiera::EntryPathLocalFile.new(trimmed_path, ['os.family', 'os.name', 'os.release.major'], [osfamily, osname, major_version])
+            end
+          else
+          end
+        end
+
         raise AbideDevUtils::Errors::ResourceDataNotFoundError, facts if rdata_files.nil? || rdata_files.empty?
 
         YAML.load_file(rdata_files[0].path)

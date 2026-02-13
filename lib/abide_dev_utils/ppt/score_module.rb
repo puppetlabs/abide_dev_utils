@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'pathname'
-require 'metadata-json-lint'
+require 'metadata_json_lint'
 require 'puppet-lint'
 require 'json'
 

@@ -42,11 +42,8 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'google-cloud-storage', '~> 1.34'
   spec.add_dependency 'hashdiff', '~> 1.0'
   spec.add_dependency 'metadata-json-lint', '~> 4.0'
-  if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.2.0')
-    spec.add_dependency 'facterdb', '~> 4.1.0'
-  else
-    spec.add_dependency 'facterdb', '~> 2.1.0'
-  end
+  spec.add_dependency 'puppet-lint', '~> 4.0'
+  spec.add_dependency 'facterdb', '~> 4.1.0' # Since we're no longer using Ruby 2.7, pinning to the latest version of Facterdb which has support for Ruby 3.0 and above.
 
   # Dev dependencies
   spec.add_development_dependency 'bundler'

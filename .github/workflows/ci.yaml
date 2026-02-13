@@ -25,7 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         ruby_version:
-          - '2.7'
+          # - '2.7'
           - '3.2'
     steps:
       - name: Checkout
@@ -35,12 +35,7 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby_version }}
-          bundler-cache: false
-      
-      - name: Install dependencies
-        run: |
-          bundle config set --local frozen false
-          bundle install
+          bundler-cache: true
 
       - name: Print bundle environment
         run: |
@@ -59,4 +54,6 @@ jobs:
         run: bundle exec rake 'sce:fixtures'
 
       - name: Run RSpec
-        run: bundle exec rake spec
+        # Going to use `rpsec` instead of `bundle exec rake spec` and manually feed it the pattern of spec files to run.
+        # `bundle exec rake spec` is running into some issue with the pattern defined in the Rakefle and was only running 8 tests.
+        run: bundle exec rspec spec/abide_dev_utils_spec.rb spec/abide_dev_utils/**/*_spec.rb
