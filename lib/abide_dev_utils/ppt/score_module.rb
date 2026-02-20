@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'pathname'
-require 'metadata-json-lint'
+require 'metadata_json_lint'
 require 'puppet-lint'
 require 'json'
 
@@ -118,14 +118,22 @@ module AbideDevUtils
         end
 
         ver_req = MetadataJsonLint::VersionRequirement.new(dependency['version_requirement'])
-        return [nil, metadata_dep_open_ended(dependency['name'], dependency['version_requirement'])] if ver_req.open_ended?
-        return [nil, metadata_dep_mixed_syntax(dependency['name'], dependency['version_requirement'])] if ver_req.mixed_syntax?
+        if ver_req.open_ended?
+          return [nil,
+                  metadata_dep_open_ended(dependency['name'], dependency['version_requirement'])]
+        end
+        if ver_req.mixed_syntax?
+          return [nil,
+                  metadata_dep_mixed_syntax(dependency['name'],
+                                            dependency['version_requirement'])]
+        end
 
         [nil, nil]
       end
 
       def metadata_dep_open_ended(name, version_req)
-        metadata_err(:dependencies, "Dependency #{name} has an open ended dependency version requirement #{version_req}")
+        metadata_err(:dependencies,
+                     "Dependency #{name} has an open ended dependency version requirement #{version_req}")
       end
 
       def metadata_dep_mixed_syntax(name, version_req)
@@ -135,7 +143,8 @@ module AbideDevUtils
       end
 
       def metadata_dep_version_range(name)
-        metadata_err(:dependencies, "Dependency #{name} has a 'version_range' attribute which is no longer used by the forge.")
+        metadata_err(:dependencies,
+                     "Dependency #{name} has a 'version_range' attribute which is no longer used by the forge.")
       end
 
       def metadata_err(check, msg)

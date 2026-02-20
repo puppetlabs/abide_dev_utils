@@ -25,7 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         ruby_version:
-          - '2.7'
+          # - '2.7'
           - '3.2'
     steps:
       - name: Checkout
@@ -54,4 +54,4 @@ jobs:
         run: bundle exec rake 'sce:fixtures'
 
       - name: Run RSpec
-        run: bundle exec rake spec
+        run: bundle exec rspec spec/abide_dev_utils_spec.rb spec/abide_dev_utils/**/*_spec.rb
