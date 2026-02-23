@@ -65,7 +65,9 @@ module AbideDevUtils
         end
 
         def fact_sets
-          @fact_sets ||= FacterDB.facterdb_fact_files.each_with_object({}) do |f, h|
+          external_fact_path = File.expand_path(File.join(__dir__, '../../../files/fact_sets'))
+          all_facts = (FacterDB.default_fact_files + FacterDB.external_fact_files(external_fact_path)).uniq
+          @fact_sets ||= all_facts.each_with_object({}) do |f, h|
             facter_version = File.basename(File.dirname(f))
             fact_set = h[facter_version] || FactSet.new(facter_version)
             fact_set.load_facts(f)
@@ -229,7 +231,9 @@ module AbideDevUtils
         # end
 
         def fact_sets
-          @fact_sets ||= FacterDB.facterdb_fact_files.each_with_object([]) do |f, ary|
+          external_fact_path = File.expand_path(File.join(__dir__, '../../../files/fact_sets'))
+          all_facts = (FacterDB.default_fact_files + FacterDB.external_fact_files(external_fact_path)).uniq
+          @fact_sets ||= all_facts.each_with_object([]) do |f, ary|
             facter_version = File.basename(File.dirname(f))
             fact_set = ary.find { |fs| fs.facter_version == facter_version }
             fact_set ||= FactSet.new(facter_version)
@@ -283,7 +287,7 @@ module AbideDevUtils
         rescue SystemStackError
           locals = {
             prev_ver_map: @previous_major_version_map,
-            current_version: current_version,
+            current_version: current_version
           }
           raise "Failed to find output while recursing versions. Locals: #{locals}"
         end
