@@ -15,6 +15,16 @@ RSpec.describe('AbideDevUtils::Sce::Benchmark') do
         )
       end
 
+      context 'when filtering controls by profile and level' do
+        it 'excludes profiles not in the filter when both prof and lvl are given' do
+          ctrl = test_objs.last.flat_map(&:controls)
+                          .find { |c| c.profiles_levels.any? { |pl| pl.start_with?('workstation;;;') } }
+          skip 'no control with workstation profile found in fixtures' unless ctrl
+          result = ctrl.filtered_profiles_levels(prof: %w[server], lvl: %w[level_1 level_2])
+          expect(result.none? { |pl| pl.start_with?('workstation;;;') }).to be(true)
+        end
+      end
+
       context 'when supplied a PuppetModule' do
         it 'creates benchmark objects correctly' do
           expect(test_objs.last.empty?).not_to be_truthy

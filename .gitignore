@@ -9,5 +9,6 @@
 /tmp/
 w10_20h2.xml
 w10_2004.xml
+.env
 # rspec failure tracking
 .rspec_status
