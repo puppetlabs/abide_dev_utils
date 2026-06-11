@@ -222,7 +222,7 @@ module AbideDevUtils
       def filtered_profiles_levels(prof: nil, lvl: nil)
         return profiles_levels if (prof.nil? || prof.empty?) && (lvl.nil? || lvl.empty?)
         if prof && lvl && !prof.empty? && !lvl.empty?
-          return profiles_levels_by_profile(prof).concat(profiles_levels_by_level(lvl))
+          return profiles_levels_by_profile(prof) & profiles_levels_by_level(lvl)
         end
         return profiles_levels_by_profile(prof) unless prof&.empty?
 

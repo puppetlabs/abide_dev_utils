@@ -78,6 +78,7 @@ module AbideDevUtils
           end
 
           def generate(doc_title = 'Reference')
+            default_profile_for_sce_linux!
             @strings = Strings.new(opts: @opts)
             md.add_title(doc_title)
             benchmarks.each do |benchmark|
@@ -121,6 +122,13 @@ module AbideDevUtils
           private
 
           attr_reader :benchmarks, :md
+
+          def default_profile_for_sce_linux!
+            return unless @module_name.split('-').last == 'sce_linux'
+            return unless @opts[:select_profile].nil? || @opts[:select_profile].empty?
+
+            @opts[:select_profile] = ['server']
+          end
         end
 
         class ConfigExampleError < StandardError; end
