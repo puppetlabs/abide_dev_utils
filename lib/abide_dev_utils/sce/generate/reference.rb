@@ -324,7 +324,9 @@ module AbideDevUtils
             @control_data[ctrl_param[:name]][:default] = ctrl_param[:default] || rsrc_param&.value
             return unless @control_data[ctrl_param[:name]][:default]
 
-            " - #{@md.italic('Default:')} #{@md.code(@control_data[ctrl_param[:name]][:default])}"
+            default = @control_data[ctrl_param[:name]][:default]
+            default_str = [Hash, Array].any? { |t| default.is_a?(t) } ? @formatter.yaml_flow(default) : default
+            " - #{@md.italic('Default:')} #{@md.code(default_str)}"
           end
 
           def param_description(ctrl_param)
@@ -467,15 +469,36 @@ module AbideDevUtils
             end
           end
 
-          # Escapes and quotes a string. If value is not a string, returns value.
-          # @param value [Any] the string to quote.
-          # @return [String] the quoted string.
-          # @return [Any] the value if it is not a string.
+          # Escapes and quotes a string. Hash and Array values are formatted as
+          # YAML flow-style so they produce valid YAML when embedded in a code block.
+          # @param value [Any] the value to quote.
+          # @return [String] the quoted/formatted value.
           def self.quote(value)
-            if value.is_a?(String)
+            case value
+            when String
               value.inspect
+            when Hash, Array
+              yaml_flow(value)
             else
               value
+            end
+          end
+
+          # Recursively formats a Hash or Array as a YAML flow-style scalar so it
+          # can be embedded inline in a YAML code block without Ruby hash-rocket syntax.
+          # @param value [Any] the value to format.
+          # @return [String] the YAML flow-style representation.
+          def self.yaml_flow(value)
+            case value
+            when Hash
+              pairs = value.map { |k, v| "#{k}: #{yaml_flow(v)}" }.join(', ')
+              "{#{pairs}}"
+            when Array
+              "[#{value.map { |v| yaml_flow(v) }.join(', ')}]"
+            when String
+              value
+            else
+              value.to_s
             end
           end
 
