@@ -1,39 +1,49 @@
-name: mend_scan
+name: Mend Scan
+run-name: 'Mend scan for ${{ github.ref_name }}'
+
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
+  schedule:
+    - cron: '0 10 * * *'
+
+env:
+  PUPPET_AUTH_TOKEN: ${{ secrets.PUPPET_AUTH_TOKEN }}
+  BUNDLE_RUBYGEMS___PUPPETCORE__PUPPET__COM: "forge-key:${{ secrets.PUPPET_AUTH_TOKEN }}"
+
 jobs:
-  build:
+  scan:
     runs-on: ubuntu-latest
     steps:
-    - name: checkout repo content
-      uses: actions/checkout@v2 # checkout the repository content to github runner.
-      with:
-        fetch-depth: 1
-    - name: setup ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: 2.7
-    - name: create lock
-      run: bundle lock
-    # install java
-    - uses: actions/setup-java@v3
-      with:
-        distribution: 'temurin' # See 'Supported distributions' for available options
-        java-version: '17'
-    # download mend
-    - name: download_mend
-      run: curl -o wss-unified-agent.jar https://unified-agent.s3.amazonaws.com/wss-unified-agent.jar
-    - name: run mend
-      run: java -jar wss-unified-agent.jar
-      env:
-        WS_APIKEY: ${{ secrets.MEND_API_KEY }}
-        WS_WSS_URL: https://saas-eu.whitesourcesoftware.com/agent
-        WS_USERKEY: ${{ secrets.MEND_TOKEN }}
-        WS_PRODUCTNAME: 'content-and-tooling' # I think this apply for our repo
-        WS_PROJECTNAME:  ${{ github.event.repository.name }}
-        WS_FILESYSTEMSCAN: true
-        WS_CHECKPOLICIES: true
-        WS_FORCEUPDATE: true
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+
+      - name: Generate Gemfile.lock
+        run: bundle lock
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Download Mend unified agent
+        run: curl -o wss-unified-agent.jar https://unified-agent.s3.amazonaws.com/wss-unified-agent.jar
+
+      - name: Run Mend scan
+        run: java -jar wss-unified-agent.jar
+        env:
+          WS_FILESYSTEMSCAN: false
+          WS_CHECKPOLICIES: true
+          WS_FORCEUPDATE: true
+          WS_APIKEY: ${{ secrets.MEND_API_KEY }}
+          WS_USERKEY: ${{ secrets.MEND_TOKEN }}
+          WS_WSS_URL: https://saas-eu.whitesourcesoftware.com/agent
+          WS_PRODUCTNAME: SCE
+          WS_PROJECTNAME: ${{ github.event.repository.name }}
