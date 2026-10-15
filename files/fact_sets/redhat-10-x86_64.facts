@@ -35,7 +35,7 @@
       "version": "1.2"
     }
   },
-  "facterversion": "5.1.0",
+  "facterversion": "4.11.0",
   "filesystems": "vfat,xfs",
   "fips_enabled": false,
   "hypervisors": {
