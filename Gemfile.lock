@@ -51,7 +51,7 @@ GEM
       base64
       nkf
       rexml
-    activesupport (8.0.2)
+    activesupport (8.0.5.2)
       base64
       benchmark (>= 0.3)
       bigdecimal
