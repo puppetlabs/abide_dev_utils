@@ -20,13 +20,14 @@ env:
 
 jobs:
   rspec:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
         ruby_version:
-          # - '2.7'
           - '3.2'
+          - '3.4'
+          - '4.0'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,7 +36,17 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby_version }}
+          bundler: latest
           bundler-cache: true
+
+      - name: Dump native extension build logs
+        if: failure()
+        run: |
+          find vendor/bundle -name mkmf.log -o -name gem_make.out | while read -r f; do
+            echo "::group::$f"; cat "$f"; echo ::endgroup::
+          done
+          echo "::group::compiler info"; which -a gcc cc || true; gcc --version || true
+          ruby -rrbconfig -e 'puts RbConfig::CONFIG.values_at("CC","CFLAGS","LDFLAGS").inspect'; echo ::endgroup::
 
       - name: Print bundle environment
         run: |
